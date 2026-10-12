@@ -1,0 +1,98 @@
+# Русские блины: учебный прогноз спроса и запасы
+
+Работающий небольшой прототип для команды новичков: Python, pandas, SQLite, PySide6 и matplotlib. **Все комплектные данные синтетические; это не реальные данные ООО «Русские блины».** Система рассчитывает рекомендации, но не отправляет заказы поставщикам.
+
+## Быстрый запуск в Windows
+
+Проект расположен в `C:\Projects\русские`. Если окружение уже установлено, дважды щёлкните **`start.bat`**, затем нажмите «Открыть учебный сценарий». Вкладка «Закупки» содержит числа, а выбор строки показывает объяснение и предупреждения. Другие вкладки: исходные данные, прогноз с графиком, MAE/WAPE, партии склада и дневной расход.
+
+Установка с нуля: Python **3.11–3.13**, PowerShell. Активация окружения не требуется.
+
+```powershell
+Set-Location -LiteralPath 'C:\Projects\русские'
+python -m venv .venv
+& .\.venv\Scripts\python.exe -m pip install -e '.[dev]'
+& .\.venv\Scripts\python.exe -m blini.cli demo --output data/demo --seed 42
+& .\.venv\Scripts\python.exe -m blini.gui
+```
+
+Для обычного приложения достаточно `pip install -e .`; `[dev]` добавляет тесты и Jupyter. После установки приложение работает локально без облака и API; интернет нужен только для скачивания зависимостей. `requirements-lock.txt` фиксирует версии окружения, в котором выполнена проверка. Для повторения именно этих версий: `& .\.venv\Scripts\python.exe -m pip install -r requirements-lock.txt`, затем `& .\.venv\Scripts\python.exe -m pip install -e . --no-deps`.
+
+## Полный путь без интерфейса
+
+```powershell
+Set-Location -LiteralPath 'C:\Projects\русские'
+& .\.venv\Scripts\python.exe -m blini.cli validate --data data/demo/normal --as-of 2026-09-30
+& .\.venv\Scripts\python.exe -m blini.cli run --data data/demo/normal --as-of 2026-09-30 --config config/default.json --db runtime/blini.sqlite --output reports/normal
+& .\.venv\Scripts\python.exe -m blini.cli run --from-db runtime/blini.sqlite --output reports/from-db
+& .\.venv\Scripts\python.exe -m pytest -q
+& .\.venv\Scripts\python.exe scripts/run_all_scenarios.py
+```
+
+`--as-of` — **конец завершённого дня и дата снимка склада**, а не дата запуска компьютера. Учебный снимок относится к **30 сентября 2026**, прогноз — 1–7 октября 2026. Чтобы рассчитать другую дату, загрузите согласованный снимок остатков и ожидаемых поставок на эту дату. SQLite хранит дату снимка; менять её без нового импорта запрещено. Импорт заменяет весь снимок; при ошибках прежний снимок остаётся.
+
+Результат: `forecast.csv` (7 дней), `planning_forecast.csv` (расширенный горизонт для закупок), `metrics.csv`, `errors.csv`, `demand.csv`, `recommendations.csv`, `inventory_log.csv`, `warnings.txt`. Все количества ингредиентов — в базовых единицах. WAPE хранится долей: `0.10 = 10%`; пустое поле означает неопределённую метрику. Неизвестный спрос/заказ также записывается пустым полем, а не нулём.
+
+`scripts/run_all_scenarios.py` сохраняет все шесть отчётов, сводку `reports/demo_summary.md`, CSV-сводку, график сравнения и проверяет совпадение закупок из CSV и SQLite. В нормальном режиме этот скрипт заменяет снимок базы обычным учебным сценарием.
+
+## Структура
+
+```text
+src/blini/
+  data.py         контракт CSV, проверки, явное приведение единиц
+  forecast.py     METHODS, два прогноза, backtest, MAE/WAPE
+  inventory.py    потребность, FEFO, страховой запас и заказ
+  config.py       проверяемые параметры
+  service.py      общий конвейер и Report (без Qt/SQLite)
+  repository.py   SQLite, внешние ключи, транзакционный импорт
+  cli.py          независимый запуск расчётов
+  gui.py          PySide6, график, расчёт в фоновом потоке
+  demo.py         генератор шести сценариев
+config/default.json
+data/templates/       восемь CSV с заголовками
+data/demo/            шесть воспроизводимых учебных наборов
+notebooks/analysis.ipynb
+tests/test_core.py
+docs/                 контракт данных, аналитика, ограничения, вопросы, проверки
+runtime/blini.sqlite  локальный снимок; создаётся при загрузке
+reports/              рассчитанные результаты сценариев
+start.bat             запуск окна двойным щелчком
+```
+
+## Учебные сценарии
+
+183 дня с 1 апреля по 30 сентября 2026, одна точка, 10 блюд, 13 ингредиентов. Генератор использует seed=42. Календарь подготовлен до 31 декабря 2026. В интерфейсе есть выбор сценария; для CLI замените последний каталог в `--data`:
+
+| Каталог | Что демонстрируется |
+|---|---|
+| `normal` | Обычная работа, объяснимая закупка с процентным запасом |
+| `weekend_growth` | Продажи выходных ×1.65; прогноз по дню недели |
+| `shortage` | Почти нет муки; ранний дефицит, который обычная поставка не успеет закрыть |
+| `expiry` | Молоко истекает 1 октября, отдельная партия уже просрочена; FEFO и списания |
+| `delayed_delivery` | Поставка мяса сдвинута с 3 на 10 октября; в 7-дневном периоде она недоступна |
+| `short_history` | У яблочного блина только пять дней продаж; явно подписанный резервный прогноз |
+
+## Ноутбук для аналитиков
+
+```powershell
+Set-Location -LiteralPath 'C:\Projects\русские'
+& .\.venv\Scripts\python.exe -m jupyterlab notebooks/analysis.ipynb
+```
+
+Он вызывает основной модуль: проверяет данные, строит графики по дням недели, сравнивает методы, показывает дневные ошибки и разложение рецептуры одного блюда, просматривает рекомендации и FEFO. При проверке выполненная копия сохраняется в `notebooks/analysis.executed.ipynb`. Воспроизведение без браузера:
+
+```powershell
+& .\.venv\Scripts\python.exe scripts/verify_notebook.py
+```
+
+Где менять алгоритмы и правила: [docs/analytics.md](docs/analytics.md). Форматы CSV: [docs/data_contract.md](docs/data_contract.md). Допущения: [docs/limitations.md](docs/limitations.md). Вопросы заказчику: [docs/customer_questions.md](docs/customer_questions.md). Результаты фактических проверок: [docs/verification.md](docs/verification.md).
+
+## Автоматическая проверка окна
+
+```powershell
+$env:QT_QPA_PLATFORM = 'offscreen'
+& .\.venv\Scripts\python.exe -m blini.gui --smoke-test
+Remove-Item Env:\QT_QPA_PLATFORM
+```
+
+Проверка создаёт окно, загружает сценарий, выполняет расчёт и SQLite-импорт, заполняет таблицы/график, экспортирует CSV и снимок `reports/gui-smoke/gui.png`, затем закрывается. Это проверка реальных виджетов и сигналов, но не ручная проверка всех диалогов выбора файлов на пользовательском мониторе.
