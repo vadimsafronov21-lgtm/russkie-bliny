@@ -1,0 +1,7 @@
+﻿scenario,forecast_rows,recommendations,early_shortage_ingredients,attention_ingredients,fallback_dishes
+normal,70,13,0,9,0
+weekend_growth,70,13,0,9,0
+shortage,70,13,1,9,0
+expiry,70,13,1,10,0
+delayed_delivery,70,13,0,9,0
+short_history,70,13,0,9,1
