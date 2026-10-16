@@ -1,0 +1,81 @@
+{
+  "source": "E:\\CodexProjects\\russkie-bliny-app\\backups\\demo-20261016T113208571944Z.db",
+  "restored_to": "E:\\CodexProjects\\russkie-bliny-app\\.cache\\restored-4158047c1e1c4f94b91aa884c45b9b12.db",
+  "integrity": "ok",
+  "foreign_keys": "ok",
+  "tables_match": true,
+  "tables": {
+    "alembic_version": {
+      "rows": 1,
+      "sha256": "5273eddb93f04a1795488067d27e8cee54f15bf1963740fc6e750f46c50f5f16"
+    },
+    "audit": {
+      "rows": 16,
+      "sha256": "3622a199ef87d8d4a4a4a3c3d5156b3c8519a2c59a3e4fce6ae1edc887794611"
+    },
+    "auth_sessions": {
+      "rows": 4,
+      "sha256": "a99005aa610183496d0f47af5adb339c161648bb6ccd6378b2e50efeb16b07f9"
+    },
+    "commands": {
+      "rows": 11,
+      "sha256": "535a8b42a85676326f10d8051b8a8880493db03b5f6aad9876f11e5c179f328f"
+    },
+    "delivery_attempts": {
+      "rows": 16,
+      "sha256": "540c1f8211cb34bb51fe9dc5f9683a7bf8160ab0077168de3e698c6130caff99"
+    },
+    "ingredients": {
+      "rows": 5,
+      "sha256": "eb6bed09f8769fe38e1eaf0c9a87cc4cf27a94e6497559a84e62a9c3f971db8a"
+    },
+    "inventory_effects": {
+      "rows": 21,
+      "sha256": "875027196abff5b1c790fd9dbb2d912d2776cc1fca6fa65e37df1daae0f15c34"
+    },
+    "locations": {
+      "rows": 3,
+      "sha256": "51d55a1965f1ba08923c92ea810d463b14dffbd45b666de80b1fade3194504c1"
+    },
+    "menu_items": {
+      "rows": 4,
+      "sha256": "2793dc8857b85d93ba124edad4980532c3a5a731620fba2a7f4715ffc1f088f0"
+    },
+    "notifications": {
+      "rows": 16,
+      "sha256": "8fa4094019bd0084d97f27554b46c9db91d81c5f6f00970571fea47ee3d1c565"
+    },
+    "receipts": {
+      "rows": 3,
+      "sha256": "50655f425fc71dae4372c1d82f48f83ec92e42d357c7077b7024867d0c0ea260"
+    },
+    "recipe_versions": {
+      "rows": 4,
+      "sha256": "65e449bba1b17419d8a36f7bfd60dcd1e7440a9a9900c2c685a09fd8e785dc9c"
+    },
+    "request_lines": {
+      "rows": 5,
+      "sha256": "a222230e0f400b15e364c3c8f1b31973a0cfa51e668d4c271cf1c8bd6dcc651f"
+    },
+    "requests": {
+      "rows": 4,
+      "sha256": "a8b7a44cd52c4bec91d712d7d37a01dcfd7b8e95b74f1ac56c0d35a6911425c1"
+    },
+    "sales": {
+      "rows": 448,
+      "sha256": "c9d4769f29e65abe0705a56636d179beb06073681fa5e5b842b6ac50ceea1a66"
+    },
+    "stocks": {
+      "rows": 15,
+      "sha256": "1188fe70d50ef97ab9d961de24bf691c7e05bc77c26a2ee889b26cb478854395"
+    },
+    "user_scopes": {
+      "rows": 10,
+      "sha256": "7e45b2c0ba5333ffe83b5eafaad82890e33ee916fd9a690457655fa4f90cd2a1"
+    },
+    "users": {
+      "rows": 5,
+      "sha256": "260d1b880cfa774fb432be5edc05658018d9d07eccb0d946e256868c68be55e3"
+    }
+  }
+}
