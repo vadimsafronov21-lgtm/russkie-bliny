@@ -1,0 +1,114 @@
+{
+  "generated": "2026-10-20T23:22:27+07:00",
+  "environment": "Windows 11, Python 3.13, Qt 6.12",
+  "end_to_end": [
+    "XLSX import",
+    "stock correction with reason",
+    "local forecast",
+    "manual edit kept separate",
+    "draft persisted",
+    "confirmed order persisted",
+    "Excel reopened in tests"
+  ],
+  "calculation_seconds": 0.653,
+  "training_window": "last 12 calendar months, strictly before calculation day",
+  "last_closed_shift": "2026-10-19",
+  "coverage_days": 4,
+  "data": "synthetic demonstration; no measured economic effect",
+  "forecasts": [
+    {
+      "name": "Блин со сметаной",
+      "segment": "Регулярный",
+      "method": "День недели",
+      "expected": 101.25,
+      "low": 84.22375974729427,
+      "high": 118.27624025270573,
+      "scores": {
+        "Среднее": 6.6801290267103575,
+        "День недели": 4.959821428571429,
+        "Свежий спрос": 7.241804992951995,
+        "Редкий спрос": 7.487877025002412
+      }
+    },
+    {
+      "name": "Блин с курицей и сыром",
+      "segment": "Регулярный",
+      "method": "День недели",
+      "expected": 164.125,
+      "low": 146.64498225378009,
+      "high": 181.60501774621991,
+      "scores": {
+        "Среднее": 7.5064850823498315,
+        "День недели": 4.4375,
+        "Свежий спрос": 7.791827322838212,
+        "Редкий спрос": 8.018248105076623
+      }
+    },
+    {
+      "name": "Блин с ветчиной и сыром",
+      "segment": "Регулярный",
+      "method": "День недели",
+      "expected": 128.875,
+      "low": 114.58500064266435,
+      "high": 143.16499935733563,
+      "scores": {
+        "Среднее": 5.629648808175157,
+        "День недели": 4.709821428571429,
+        "Свежий спрос": 5.959351364830334,
+        "Редкий спрос": 6.008507789656511
+      }
+    },
+    {
+      "name": "Блин с вишней",
+      "segment": "Регулярный",
+      "method": "День недели",
+      "expected": 76.5,
+      "low": 64.86963860740136,
+      "high": 88.13036139259864,
+      "scores": {
+        "Среднее": 4.774381076013935,
+        "День недели": 3.9107142857142856,
+        "Свежий спрос": 4.780020919004335,
+        "Редкий спрос": 4.813258192113493
+      }
+    },
+    {
+      "name": "Блин с икрой",
+      "segment": "Редкий",
+      "method": "Свежий спрос",
+      "expected": 8.744581029979585,
+      "low": 4.017326142044071,
+      "high": 13.471835917915099,
+      "scores": {
+        "Среднее": 1.9794830206900338,
+        "День недели": 1.9776785714285714,
+        "Свежий спрос": 1.8747778696639694,
+        "Редкий спрос": 1.8792086204146423
+      }
+    }
+  ],
+  "tests": {
+    "passed": 37,
+    "failed": 0
+  },
+  "windowed_exe_smoke": {
+    "status": "PASS",
+    "steps": [
+      "Qt screens",
+      "XLSX import",
+      "stock correction",
+      "forecast",
+      "manual edit",
+      "SQLite confirmation",
+      "Excel export"
+    ],
+    "order_id": 1,
+    "time": "2026-10-20T23:24:22+07:00"
+  },
+  "binary_sha256": "68d16657407d405a6ad6fb5737d5a206b6e9fc12c9f4f1b67d95f0866e069ff2",
+  "source_sha256": {
+    "app.py": "5a460cc1ef1c76db3b03451e10fd15c94aabde79c3c05235077d698793f8ddf1",
+    "core.py": "3392c8383554668c0ca36c67e51d1b0bdd9bc3b858a40fa001d69494a86607ff"
+  },
+  "packaging": "One-file Windows x64; isolated DLL search path via build.py"
+}

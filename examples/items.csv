@@ -1,0 +1,13 @@
+﻿id;name;kind;unit;price;cost;pack;target;fallback;_dataset
+classic;Блин со сметаной;dish;шт;145;47;1;0;25;DEMO
+chicken;Блин с курицей и сыром;dish;шт;265;104;1;0;38;DEMO
+ham;Блин с ветчиной и сыром;dish;шт;245;91;1;0;30;DEMO
+berry;Блин с вишней;dish;шт;205;72;1;0;18;DEMO
+caviar;Блин с икрой;dish;шт;490;260;1;0;2;DEMO
+dough;Тесто блинное;ingredient;л;95;95;5;3;0;DEMO
+cream;Сметана;ingredient;кг;280;280;1;0.3;0;DEMO
+chicken_i;Куриная начинка;ingredient;кг;470;470;1;0.5;0;DEMO
+cheese;Сыр;ingredient;кг;690;690;1;0.4;0;DEMO
+ham_i;Ветчина;ingredient;кг;520;520;1;0.4;0;DEMO
+cherry;Вишневая начинка;ingredient;кг;390;390;2;0.3;0;DEMO
+caviar_i;Икра;ingredient;кг;4200;4200;0.25;0.05;0;DEMO

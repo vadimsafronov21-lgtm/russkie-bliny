@@ -1,0 +1,13 @@
+﻿dish;ingredient;amount;unit;version;valid_from;_dataset
+classic;dough;0.12;л;1;2025-10-20;DEMO
+classic;cream;0.04;кг;1;2025-10-20;DEMO
+chicken;dough;0.12;л;1;2025-10-20;DEMO
+chicken;chicken_i;0.08;кг;1;2025-10-20;DEMO
+chicken;cheese;0.025;кг;1;2025-10-20;DEMO
+ham;dough;0.12;л;1;2025-10-20;DEMO
+ham;ham_i;0.065;кг;1;2025-10-20;DEMO
+ham;cheese;0.025;кг;1;2025-10-20;DEMO
+berry;dough;0.12;л;1;2025-10-20;DEMO
+berry;cherry;0.08;кг;1;2025-10-20;DEMO
+caviar;dough;0.12;л;1;2025-10-20;DEMO
+caviar;caviar_i;0.025;кг;1;2025-10-20;DEMO
