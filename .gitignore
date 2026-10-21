@@ -5,4 +5,11 @@ build/
 *.spec
 qa/data/
 qa/packaged-data/
+qa/*-data/
+qa/*-smoke/input/
+qa/*-smoke/*.png
+qa/*-smoke/*.xlsx
+qa/*-smoke/smoke-error.txt
+qa/redesign*/
+qa/test-results.xml
 *.sqlite3*

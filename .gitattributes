@@ -6,3 +6,4 @@
 *.exe binary
 *.png binary
 *.xlsx binary
+assets/fonts/OFL.txt -whitespace

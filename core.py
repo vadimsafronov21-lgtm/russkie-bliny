@@ -419,7 +419,7 @@ def export_order(path,payload,order_id):
     for sheet in wb:
         sheet.freeze_panes='A5' if sheet==ws else 'A2'
         header=4 if sheet==ws else 1
-        for cell in sheet[header]: cell.fill=PatternFill('solid',fgColor='254E43'); cell.font=Font(color='FFFFFF',bold=True)
+        for cell in sheet[header]: cell.fill=PatternFill('solid',fgColor='A4002A'); cell.font=Font(color='FFFFFF',bold=True)
         for row in sheet:
             for cell in row:
                 if isinstance(cell.value,str) and cell.value.startswith(('=','+','-','@')): cell.data_type='s'

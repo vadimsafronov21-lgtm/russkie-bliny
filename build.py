@@ -9,4 +9,4 @@ env=os.environ.copy()
 win=Path(env.get('SystemRoot',r'C:\Windows'))
 env['PATH']=os.pathsep.join([str(Path(sys.executable).parent),sys.base_prefix,str(win/'System32'),str(win)])
 console='--console' if '--console' in sys.argv else '--windowed'
-subprocess.run([sys.executable,'-m','PyInstaller','--noconfirm','--clean','--onefile',console,'--name','RusskieBliny','app.py'],cwd=root,env=env,check=True)
+subprocess.run([sys.executable,'-m','PyInstaller','--noconfirm','--clean','--onefile',console,'--add-data','assets;assets','--name','RusskieBliny','app.py'],cwd=root,env=env,check=True)
