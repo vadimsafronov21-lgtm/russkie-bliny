@@ -11,5 +11,6 @@ qa/*-smoke/*.png
 qa/*-smoke/*.xlsx
 qa/*-smoke/smoke-error.txt
 qa/redesign*/
+qa/graph*/
 qa/test-results.xml
 *.sqlite3*

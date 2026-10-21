@@ -29,6 +29,8 @@ PATHS={
  'refresh':'<path d="M20 8a9 9 0 0 0-15-3L3 8m0-5v5h5M4 16a9 9 0 0 0 15 3l2-3m0 5v-5h-5"/>',
  'down':'<path d="m7 10 5 5 5-5"/>',
  'user':'<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>',
+ 'chart':'<path d="M3 3v18h18M6 15l4-5 4 2 6-7"/>',
+ 'expand':'<path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/>',
 }
 
 def svg_icon(name,color=INK,size=20):
@@ -71,6 +73,18 @@ QLabel#metricAlert { font-size: 30px; font-weight: 600; color: #A4002A; letter-s
 QLabel#metricIndex { font-size: 11px; color: #AE9DA4; }
 QLabel#total { font-size: 29px; font-weight: 600; letter-spacing: -0.8px; }
 QFrame#surface, QFrame#card { background: #FFFFFF; border: 1px solid #E9E8ED; border-radius: 12px; }
+QFrame#chartCard { background: #FFFFFF; border: 1px solid #EFEBF1; border-radius: 21px; }
+QFrame#viewSwitch { background: #ECE8F0; border: none; border-radius: 10px; }
+QPushButton#viewMode { background: transparent; color: #95899D; border: none; border-radius: 7px; padding: 8px 17px; font-size: 12px; }
+QPushButton#viewMode:checked { background: white; color: #A4002A; font-weight: 600; }
+QLabel#chartTitle { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+QLabel#chartMetric { font-size: 31px; font-weight: 600; letter-spacing: -0.8px; }
+QLabel#metricHint { font-size: 10px; color: #98909E; }
+QLabel#legendStock { color: #A4002A; font-size: 10px; }
+QLabel#legendIncoming { color: #D18AA2; font-size: 10px; }
+QPushButton#period { background: #F5F2F6; color: #8F8492; border: none; border-radius: 7px; padding: 7px 12px; min-height: 14px; font-size: 11px; }
+QPushButton#period:checked { background: #F9E8EB; color: #A4002A; font-weight: 600; }
+QPushButton#period:disabled { color: #C3BBC6; background: #F7F5F8; }
 QFrame#flat { background: #FFFFFF; border: none; }
 QFrame#delivery { background: #A4002A; border: none; border-radius: 12px; }
 QFrame#delivery QLabel { color: #FFFFFF; background: transparent; }

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-21T22:01:17+07:00",
+  "generated": "2026-10-21T22:38:31+07:00",
   "environment": "Windows 11, Python 3.13, Qt 6.12",
   "end_to_end": [
     "XLSX import",
@@ -10,7 +10,7 @@
     "confirmed order persisted",
     "Excel reopened in tests"
   ],
-  "calculation_seconds": 0.367,
+  "calculation_seconds": 0.383,
   "training_window": "last 12 calendar months, strictly before calculation day",
   "last_closed_shift": "2026-10-20",
   "coverage_days": 4,
@@ -88,8 +88,9 @@
     }
   ],
   "tests": {
-    "passed": 38,
-    "failed": 0
+    "passed": 47,
+    "failed": 0,
+    "skipped": 0
   },
   "windowed_exe_smoke": {
     "status": "PASS",
@@ -103,13 +104,16 @@
       "Excel export"
     ],
     "order_id": 1,
-    "time": "2026-10-21T22:02:23+07:00"
+    "time": "2026-10-21T22:40:26+07:00"
   },
-  "binary_sha256": "304074fcf2bc581adf9d11ee4d642529fa04099afe496832253296da3e83f265",
+  "binary_sha256": "a78ee0143cbc55ff9be7a03e07ea211e30b2b983c0f1743fb0eb7be808cfed15",
   "source_sha256": {
-    "app.py": "9e778514b9932a76afc73a7d267662da95d8008ed5de8388fed9b23f1f3c97d8",
+    "app.py": "829b1077d64e1994b7230b3bfba6f667217bda838ce5e04ebd6d5931083553c3",
     "core.py": "8eeb9b0e539a70fb866c97c3c08c994dd64e35e6f8dc467bc735901ed0f68f06",
-    "ui_theme.py": "bb71f971a42ca91b7272f09ff4fffa7d733c3f0dd55cda01c24f44bd82c2506d"
+    "ui_theme.py": "af6de2390cb9f5749d3626d6b19c42e1d7c64923b6f32f777f4e3fbc918d0b3c",
+    "charts.py": "a2221f1dfc1f38a4b7cb1c347783bdb7a92fec20749c2f58937ad99ba5e3248e",
+    "analytics_data.py": "633c6df8cd0cb2b89331f9b0e08d35c26de47fe0f8f6f7f2f8ca6b233c253347",
+    "analytics_view.py": "108a6203877f67c6fbe6bed8f16e87ceab85a7f6127798df58b4714af59a40b8"
   },
   "packaging": "One-file Windows x64; isolated DLL search path via build.py"
 }

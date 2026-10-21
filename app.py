@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QVBoxLayout,QHBo
     QFrame,QStackedWidget,QComboBox,QLineEdit,QTableWidget,QTableWidgetItem,QHeaderView,QAbstractItemView,
     QMessageBox,QFileDialog,QDialog,QFormLayout,QDialogButtonBox,QDoubleSpinBox,QSpinBox,QTextEdit,
     QCheckBox,QDateEdit,QSplitter,QScrollArea,QSizePolicy,QGridLayout,QToolTip)
+from analytics_view import AnalyticsPanel
 from core import Store,DataError,calculate,now,export_order,write_templates,LABELS,SCHEMAS
 
 from ui_theme import STYLE,ASSETS,BURGUNDY,INK,DataTable,svg_icon,configure_application
@@ -47,52 +48,6 @@ def fill(t,rows,colors=None):
     t.update_empty(); t.setUpdatesEnabled(True)
 
 
-class MonthChart(QWidget):
-    COLORS=['#D1A6B3','#111E30','#A4002A']
-    def __init__(self):
-        super().__init__(); self.series=[]; self.hover_day=None; self.setMinimumHeight(155); self.setMouseTracking(True)
-    def set_data(self,sales,dish,point,day):
-        self.series=[]
-        for delta in [3,2,1]:
-            n=day.year*12+day.month-1-delta; y,m=divmod(n,12); m+=1
-            records={int(str(r['date'])[8:]):float(r['qty']) for r in sales if str(r['dish'])==dish and str(r['point'])==point and str(r['date']).startswith(f'{y}-{m:02}')}
-            names=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
-            self.series.append((f'{names[m-1]} {y}',records))
-        self.update()
-    def mouseMoveEvent(self,event):
-        self.hover_day=max(1,min(31,round(1+(event.position().x()-35)/(max(1,self.width()-52))*30)))
-        lines=[f'{self.hover_day}-е число']+[f'{name}: {values.get(self.hover_day,"нет данных")} порций' for name,values in self.series]
-        QToolTip.showText(event.globalPosition().toPoint(),'\n'.join(lines),self); self.update()
-    def leaveEvent(self,event): self.hover_day=None; QToolTip.hideText(); self.update()
-    def paintEvent(self,event):
-        p=QPainter(self); p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        w,h=self.width(),self.height(); left,top,right,bottom=35,12,w-17,h-42
-        maximum=max([v for _,s in self.series for v in s.values()]+[1])*1.16
-        f=QFont('Inter'); f.setPixelSize(10); p.setFont(f)
-        for i in range(4):
-            y=bottom-(bottom-top)*i/3
-            p.setPen(QPen(QColor('#EFEDF2'),1)); p.drawLine(QPointF(left,y),QPointF(right,y))
-            p.setPen(QColor('#9A9DA8')); p.drawText(QRectF(0,y-8,26,16),Qt.AlignmentFlag.AlignRight,f'{maximum*i/3:.0f}')
-        for j,(name,s) in enumerate(self.series):
-            p.setBrush(Qt.BrushStyle.NoBrush)
-            path=QPainterPath(); last=None
-            for d,v in sorted(s.items()):
-                x=left+(right-left)*(d-1)/30; y=bottom-(bottom-top)*v/maximum
-                if last is None or d!=last+1: path.moveTo(x,y)
-                else: path.lineTo(x,y)
-                last=d
-            pen=QPen(QColor(self.COLORS[j]),2 if j==2 else 1.5)
-            if j==0: pen.setStyle(Qt.PenStyle.DashLine)
-            p.setPen(pen); p.drawPath(path)
-            if s:
-                d=max(s); p.setBrush(QColor(self.COLORS[j])); p.setPen(Qt.PenStyle.NoPen); p.drawEllipse(QPointF(left+(right-left)*(d-1)/30,bottom-(bottom-top)*s[d]/maximum),2.5,2.5)
-            x=left+j*155; p.setPen(QPen(QColor(self.COLORS[j]),2)); p.drawLine(QPointF(x,h-4),QPointF(x+16,h-4)); p.setPen(QColor('#858997')); p.drawText(QPointF(x+24,h),name)
-        p.setPen(QColor('#979BA7'))
-        for d in [1,5,10,15,20,25,31]: p.drawText(QPointF(left+(right-left)*(d-1)/30-3,bottom+20),str(d))
-        if self.hover_day:
-            x=left+(right-left)*(self.hover_day-1)/30; pen=QPen(QColor('#C7B5BE'),1,Qt.PenStyle.DotLine); p.setPen(pen); p.drawLine(QPointF(x,top),QPointF(x,bottom))
-        if not any(s for _,s in self.series):
-            p.setPen(QColor('#777C89')); p.drawText(QRectF(left,top,right-left,bottom-top),Qt.AlignmentFlag.AlignCenter,'Нет продаж за эти месяцы')
 
 
 class MainWindow(QMainWindow):
@@ -103,8 +58,8 @@ class MainWindow(QMainWindow):
         sidebar=QWidget(); sidebar.setObjectName('sidebar'); sidebar.setFixedWidth(208); side=QVBoxLayout(sidebar); side.setContentsMargins(16,25,16,20); side.setSpacing(6)
         brand=QLabel(); brand.setPixmap(QPixmap(str(ASSETS/'krona-wordmark.png')).scaledToWidth(151,Qt.TransformationMode.SmoothTransformation)); brand.setContentsMargins(8,0,0,0); side.addWidget(brand)
         client=label('РУССКИЕ БЛИНЫ','workspace'); client.setContentsMargins(9,10,0,0); side.addWidget(client); side.addSpacing(37)
-        self.nav=[]; self.nav_icons=['stock','order','import','history','settings']
-        for idx,name in enumerate(['Остатки','Заявка','Данные','История','Настройки']):
+        self.nav=[]; self.nav_icons=['chart','order','import','history','settings']
+        for idx,name in enumerate(['Обзор','Заявка','Данные','История','Настройки']):
             b=button(name,lambda checked=False,i=idx:self.navigate(i)); b.setCheckable(True); b.setIcon(svg_icon(self.nav_icons[idx],'#8B8E9B')); b.setIconSize(QSize(19,19)); b.setToolTip(f'{name} · Ctrl+{idx+1}'); self.nav.append(b); side.addWidget(b)
         side.addStretch()
         local=QFrame(); local.setObjectName('rail'); localbox=QVBoxLayout(local); localbox.setContentsMargins(13,14,13,14); localbox.setSpacing(7)
@@ -127,7 +82,7 @@ class MainWindow(QMainWindow):
         self.shortcuts=[]
         for i in range(5):
             shortcut=QShortcut(QKeySequence(f'Ctrl+{i+1}'),self); shortcut.activated.connect(lambda ix=i:self.navigate(ix)); self.shortcuts.append(shortcut)
-        search_shortcut=QShortcut(QKeySequence('Ctrl+K'),self); search_shortcut.activated.connect(lambda:(self.navigate(0),self.search.setFocus())); self.shortcuts.append(search_shortcut)
+        search_shortcut=QShortcut(QKeySequence('Ctrl+K'),self); search_shortcut.activated.connect(lambda:(self.navigate(0),self.switch_stock_view(1),self.search.setFocus())); self.shortcuts.append(search_shortcut)
         self.reload(); self.navigate(0)
 
 
@@ -162,12 +117,20 @@ class MainWindow(QMainWindow):
         self.reload()
 
     def build_stock(self):
-        box=self.page('Остатки','Фактическое наличие и потребность к следующему пополнению')
+        box=self.page('Обзор точки','Продажи, ожидаемый спрос и запас для следующего пополнения')
         primary=button('Сформировать заявку',self.make_order,True); primary.setIcon(svg_icon('arrow','#FFFFFF')); self.page_actions[0].addWidget(primary)
+        switcher=QFrame(); switcher.setObjectName('viewSwitch'); switcher.setFixedHeight(42); view_tabs=QHBoxLayout(switcher); view_tabs.setContentsMargins(4,4,4,4); view_tabs.setSpacing(3); self.stock_view_tabs=[]
+        for i,name in enumerate(['Графики','Остатки']):
+            tab=button(name,lambda checked=False,index=i:self.switch_stock_view(index)); tab.setObjectName('viewMode'); tab.setCheckable(True); self.stock_view_tabs.append(tab); view_tabs.addWidget(tab)
+        self.page_actions[0].insertWidget(1,switcher)
+        self.stock_views=QStackedWidget(); box.addWidget(self.stock_views,1)
+        self.analytics=AnalyticsPanel(); self.analytics.ingredientSelected.connect(self.explain_chart_ingredient); self.stock_views.addWidget(self.analytics)
+        self.chart_dish=self.analytics.dish_combo; self.chart=self.analytics.sales_chart
+        inventory_page=QWidget(); inventory_box=QVBoxLayout(inventory_page); inventory_box.setContentsMargins(0,0,0,0); inventory_box.setSpacing(18)
         summary=QHBoxLayout(); summary.setSpacing(38); self.metrics=[]
         for j,name in enumerate(['Ингредиентов','К пополнению','Возможный излишек']):
             metric=QVBoxLayout(); metric.setSpacing(3); row=QHBoxLayout(); val=label('—','metricAlert' if j==1 else 'number'); self.metrics.append(val); row.addWidget(val); row.addStretch(); metric.addLayout(row); metric.addWidget(label(name,'subtitle')); summary.addLayout(metric)
-        summary.addStretch(); box.addLayout(summary)
+        summary.addStretch(); inventory_box.addLayout(summary)
         main=QHBoxLayout(); main.setSpacing(20); left=QVBoxLayout(); left.setSpacing(16)
         inventory=QFrame(); inventory.setObjectName('surface'); inventorybox=QVBoxLayout(inventory); inventorybox.setContentsMargins(0,0,0,6); inventorybox.setSpacing(0)
         toolbar=QHBoxLayout(); toolbar.setContentsMargins(18,12,18,9); toolbar.setSpacing(6)
@@ -180,10 +143,6 @@ class MainWindow(QMainWindow):
         self.stock_table=table(['Ингредиент','Факт','Порций¹','На период','Состояние']); self.stock_table.setMinimumHeight(280); self.stock_table.doubleClicked.connect(self.explain_stock); inventorybox.addWidget(self.stock_table,1)
         tablefoot=QHBoxLayout(); tablefoot.setContentsMargins(17,7,17,4); tablefoot.addWidget(label('¹ По норме техкарты. Общие ингредиенты не суммируются в порции.','subtitle'),1)
         edit=button('Сверить / списать',self.edit_stock); edit.setObjectName('quiet'); edit.setIcon(svg_icon('edit',BURGUNDY,17)); tablefoot.addWidget(edit); inventorybox.addLayout(tablefoot); left.addWidget(inventory,1)
-        chart_surface=QFrame(); chart_surface.setObjectName('surface'); chartbox=QVBoxLayout(chart_surface); chartbox.setContentsMargins(20,15,20,15); chartbox.setSpacing(4)
-        chart_heading=QHBoxLayout(); chart_heading.addWidget(label('Продажи по месяцам','section')); chart_heading.addWidget(label('порций в день','subtitle')); chart_heading.addStretch()
-        self.chart_dish=QComboBox(); self.chart_dish.setMinimumWidth(230); self.chart_dish.currentIndexChanged.connect(self.refresh_chart); chart_heading.addWidget(self.chart_dish); chartbox.addLayout(chart_heading)
-        self.chart=MonthChart(); chartbox.addWidget(self.chart); left.addWidget(chart_surface)
         main.addLayout(left,1)
         rail=QWidget(); rail.setFixedWidth(252); right=QVBoxLayout(rail); right.setContentsMargins(0,0,0,0); right.setSpacing(18)
         delivery=QFrame(); delivery.setObjectName('delivery'); d=QVBoxLayout(delivery); d.setContentsMargins(21,22,21,21); d.setSpacing(13)
@@ -198,7 +157,9 @@ class MainWindow(QMainWindow):
         note=label('Перед заказом\nсверьте фактическое наличие.\nРекомендация останется\nдоступной для изменений.','subtitle'); note.setWordWrap(True); note.setContentsMargins(4,2,4,0); right.addWidget(note); right.addStretch()
         delivery.setMinimumHeight(205); info.setMinimumHeight(300)
         rail_scroll=QScrollArea(); rail_scroll.setWidgetResizable(True); rail_scroll.setFrameShape(QFrame.Shape.NoFrame); rail_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff); rail_scroll.setFixedWidth(260); rail_scroll.setWidget(rail); main.addWidget(rail_scroll)
-        box.addLayout(main,1)
+        inventory_box.addLayout(main,1)
+        self.stock_views.addWidget(inventory_page); self.switch_stock_view(0)
+
 
 
     def reload(self):
@@ -231,7 +192,15 @@ class MainWindow(QMainWindow):
         if ix>=0: self.chart_dish.setCurrentIndex(ix)
         self.chart_dish.blockSignals(False); self.refresh_chart(); self.refresh_quality()
     def refresh_chart(self):
-        if hasattr(self,'chart'): self.chart.set_data(self.store.get('tables',{}).get('sales',[]),str(self.chart_dish.currentData()),self.pid(),self.calc_day())
+        if hasattr(self,'analytics'): self.analytics.set_data(self.store.get('tables',{}),self.pid(),self.calc_day(),self.snapshot)
+    def switch_stock_view(self,index):
+        self.stock_views.setCurrentIndex(index)
+        for i,tab in enumerate(self.stock_view_tabs): tab.setChecked(i==index)
+
+    def explain_chart_ingredient(self,id):
+        row=next((r for r in (self.snapshot or {}).get('rows',[]) if str(r['id'])==id),None)
+        if row: self.show_explanation(row)
+
     def refresh_stock(self):
         if not hasattr(self,'stock_table'): return
         rows=(self.snapshot or {}).get('rows',[]); q=self.search.text().lower(); mode=self.filter.currentIndex()
@@ -542,6 +511,14 @@ def main():
                 for i,name in enumerate(['stock','order','import','history','settings']):
                     if i==1: window._make_order()
                     window.navigate(i); application.processEvents(); window.grab().save(str(folder/(name+'.png')))
+                    if i==0:
+                        window.switch_stock_view(1); application.processEvents(); window.grab().save(str(folder/'inventory.png')); window.switch_stock_view(0)
+                        window.analytics.mode_combo.setCurrentIndex(1); application.processEvents(); window.grab().save(str(folder/'months.png')); window.analytics.mode_combo.setCurrentIndex(0)
+                        application.processEvents(); window.analytics.findChild(QScrollArea).widget().grab().save(str(folder/'overview-body.png'))
+                        def capture_large_chart():
+                            dialog=application.activeModalWidget()
+                            if dialog: dialog.grab().save(str(folder/'large-chart.png')); dialog.accept()
+                        QTimer.singleShot(150,capture_large_chart); window.analytics.fullscreen()
                 # Exercise bundled XLSX reader/writer and SQLite, not just Qt startup.
                 write_templates(folder/'input',store.get('tables'))
                 store.import_file(folder/'input'/'demo.xlsx',author='Smoke test')
