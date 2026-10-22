@@ -59,4 +59,5 @@ def make_analytics(tables,point,dish,cutoff,days=30,snapshot=None,monthly=False)
             'observed':len(observed),'length':length,'total':total,'average':total/len(observed) if observed else None,
             'peak':max(observed,key=lambda p:p['value']) if observed else None,'delta':delta,'forecast':forecast,
             'months':month_series,'composition':ranked,'composition_total':sum(r['value'] for r in ranked),'composition_observed':composition_observed,
-            'coverage':coverage[:7],'coverage_count':len(coverage),'monthly':monthly}
+            'coverage':coverage[:7],'coverage_count':len(coverage),'monthly':monthly,
+            'last_closed':max(selected) if selected else None}

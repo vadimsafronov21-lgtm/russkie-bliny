@@ -3,6 +3,8 @@ import calendar
 import json
 import os
 import sys
+import uuid
+import sqlite3
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -13,7 +15,9 @@ from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QVBoxLayout,QHBo
     QMessageBox,QFileDialog,QDialog,QFormLayout,QDialogButtonBox,QDoubleSpinBox,QSpinBox,QTextEdit,
     QCheckBox,QDateEdit,QSplitter,QScrollArea,QSizePolicy,QGridLayout,QToolTip)
 from analytics_view import AnalyticsPanel
-from core import Store,DataError,calculate,now,export_order,write_templates,LABELS,SCHEMAS
+from core import Store,DataError,calculate,calculation_day,order_impact,now,export_order,write_templates,LABELS,SCHEMAS
+from charts import StockProjectionChart
+from workflows import StockCorrectionDialog,QuantityDialog,OrderDetailsDialog,dialog_buttons,order_total,readable_change
 
 from ui_theme import STYLE,ASSETS,BURGUNDY,INK,DataTable,svg_icon,configure_application
 
@@ -52,7 +56,7 @@ def fill(t,rows,colors=None):
 
 class MainWindow(QMainWindow):
     def __init__(self,store):
-        super().__init__(); self.store=store; self.current=None; self.busy=False; self.stock_revision=None; self.page_actions=[]
+        super().__init__(); self.store=store; self.store.sync_day(); self.current=None; self.busy=False; self.stock_revision=None; self.page_actions=[]; self.calculation_error=None
         self.setWindowTitle('КРОНА · Русские блины'); self.resize(1560,1020); self.setMinimumSize(1180,800)
         root=QWidget(); self.setCentralWidget(root); outer=QHBoxLayout(root); outer.setContentsMargins(0,0,0,0); outer.setSpacing(0)
         sidebar=QWidget(); sidebar.setObjectName('sidebar'); sidebar.setFixedWidth(208); side=QVBoxLayout(sidebar); side.setContentsMargins(16,25,16,20); side.setSpacing(6)
@@ -75,6 +79,9 @@ class MainWindow(QMainWindow):
         self.point.currentIndexChanged.connect(self.point_changed); top.addWidget(self.point); top.addStretch()
         self.banner=label('','demo'); top.addWidget(self.banner); top.addSpacing(6)
         self.day_label=label(date.today().strftime('%d.%m.%Y'),'subtitle'); top.addWidget(self.day_label); area.addLayout(top)
+        self.problem_box=QFrame(); self.problem_box.setObjectName('rail'); problem_layout=QHBoxLayout(self.problem_box)
+        self.problem_text=label('','notice'); self.problem_text.setWordWrap(True); problem_layout.addWidget(self.problem_text,1)
+        self.problem_action=button('Проверить данные',self.resolve_problem); problem_layout.addWidget(self.problem_action); area.addWidget(self.problem_box); self.problem_box.hide()
         self.stack=QStackedWidget(); area.addWidget(self.stack,1)
         self.status=label('','subtitle'); self.status.setStyleSheet('font-size: 10px; color: #9598A3;'); area.addWidget(self.status)
         outer.addWidget(content,1)
@@ -84,11 +91,18 @@ class MainWindow(QMainWindow):
             shortcut=QShortcut(QKeySequence(f'Ctrl+{i+1}'),self); shortcut.activated.connect(lambda ix=i:self.navigate(ix)); self.shortcuts.append(shortcut)
         search_shortcut=QShortcut(QKeySequence('Ctrl+K'),self); search_shortcut.activated.connect(lambda:(self.navigate(0),self.switch_stock_view(1),self.search.setFocus())); self.shortcuts.append(search_shortcut)
         self.reload(); self.navigate(0)
+        self.day_timer=QTimer(self); self.day_timer.setInterval(30000); self.day_timer.timeout.connect(self.check_day); self.day_timer.start()
 
 
     def pid(self): return str(self.point.currentData() or '')
     def author(self): return self.store.get('settings',{}).get('author','Продавец')
-    def calc_day(self): return date.fromisoformat(self.store.get('settings',{}).get('calculation_date',date.today().isoformat()))
+    def calc_day(self): return calculation_day(self.store.get('settings',{}))
+    def check_day(self):
+        if self.store.sync_day():
+            if self.today_check.isChecked(): self.date_input.setDate(date.today())
+            self.reload()
+    def resolve_problem(self):
+        self.navigate(4 if self.calculation_error and 'постав' in self.calculation_error.lower() else 2)
     def page(self,title,subtitle):
         p=QWidget(); box=QVBoxLayout(p); box.setContentsMargins(0,0,0,0); box.setSpacing(18)
         heading=QHBoxLayout(); heading.setSpacing(20); wording=QVBoxLayout(); wording.setSpacing(7); wording.addWidget(label(title,'title')); sub=label(subtitle,'subtitle'); sub.setWordWrap(True); wording.addWidget(sub); heading.addLayout(wording,1)
@@ -104,7 +118,7 @@ class MainWindow(QMainWindow):
     def error(self,e): QMessageBox.warning(self,'Нужно проверить',str(e))
     def safe(self,fn):
         try: return fn()
-        except (DataError,OSError,ValueError,KeyError) as e: self.error(e)
+        except (DataError,OSError,ValueError,KeyError,sqlite3.Error) as e: self.error(e)
     def network_changed(self):
         self.status.setText('Режим без связи. Прогноз, черновики и экспорт работают на этом компьютере.' if self.offline.isChecked() else 'Сохранение на этом компьютере. Подключение к учётным системам не настроено.')
 
@@ -142,6 +156,7 @@ class MainWindow(QMainWindow):
         inventorybox.addLayout(toolbar)
         self.stock_table=table(['Ингредиент','Факт','Порций¹','На период','Состояние']); self.stock_table.setMinimumHeight(280); self.stock_table.doubleClicked.connect(self.explain_stock); inventorybox.addWidget(self.stock_table,1)
         tablefoot=QHBoxLayout(); tablefoot.setContentsMargins(17,7,17,4); tablefoot.addWidget(label('¹ По норме техкарты. Общие ингредиенты не суммируются в порции.','subtitle'),1)
+        stock_chart=button('График запаса',self.open_stock_chart); stock_chart.setObjectName('quiet'); tablefoot.addWidget(stock_chart)
         edit=button('Сверить / списать',self.edit_stock); edit.setObjectName('quiet'); edit.setIcon(svg_icon('edit',BURGUNDY,17)); tablefoot.addWidget(edit); inventorybox.addLayout(tablefoot); left.addWidget(inventory,1)
         main.addLayout(left,1)
         rail=QWidget(); rail.setFixedWidth(252); right=QVBoxLayout(rail); right.setContentsMargins(0,0,0,0); right.setSpacing(18)
@@ -167,9 +182,15 @@ class MainWindow(QMainWindow):
         self.banner.setText('Демонстрационные данные' if demo else 'Данные из файлов')
         self.banner.setToolTip('Синтетические продажи и условные настройки. Экономический эффект не доказан.' if demo else 'Проверьте полноту выгрузки, технологические карты и пригодность остатков.')
         self.network_changed()
-        self.snapshot=None
+        self.snapshot=None; self.calculation_error=None
+        manual=self.store.get('settings',{}).get('date_mode')=='manual'
+        self.day_label.setText(('Ручная дата: ' if manual else '')+self.calc_day().strftime('%d.%m.%Y'))
         try: self.snapshot=calculate(tables,self.pid(),self.calc_day(),self.store.get('settings',{}))
-        except (DataError,KeyError,ValueError) as e: self.status.setText('Расчёт недоступен: '+str(e))
+        except (DataError,KeyError,ValueError) as e:
+            self.calculation_error=str(e); self.status.setText('Расчёт недоступен: '+str(e))
+        problems=([self.calculation_error] if self.calculation_error else (self.snapshot or {}).get('errors',[]))
+        self.problem_box.setVisible(bool(problems)); self.problem_text.setText('Расчёт требует внимания: '+ '; '.join(problems[:3]))
+        self.problem_action.setText('Настроить поставки' if self.calculation_error and 'постав' in self.calculation_error.lower() else 'Проверить данные')
         if self.snapshot:
             s=self.snapshot; last=s.get('last_closed') or 'нет данных'; stale=not s.get('last_closed') or (max(self.calc_day(),date.today())-date.fromisoformat(last)).days>1
             readable=date.fromisoformat(last).strftime('%d.%m.%Y') if s.get('last_closed') else last
@@ -179,7 +200,8 @@ class MainWindow(QMainWindow):
             rows=s['rows']; vals=[str(len(rows)),str(sum(r['packs']>0 for r in rows)),str(sum(r['surplus']>r['target'] for r in rows)),f'{delivery.day} {months[delivery.month-1]}']
             for l,v in zip(self.metrics,vals): l.setText(v)
         else:
-            self.fresh.setText('Недостаточно данных для расчёта. Откройте «Данные и импорт».')
+            self.fresh.setText('Расчёт недоступен.\n'+(self.calculation_error or 'Проверьте данные.'))
+            self.delivery_period.setText('Период не рассчитан')
             for l in self.metrics: l.setText('—')
         self.refresh_stock()
         saved=self.store.get('draft:'+self.pid())
@@ -192,7 +214,9 @@ class MainWindow(QMainWindow):
         if ix>=0: self.chart_dish.setCurrentIndex(ix)
         self.chart_dish.blockSignals(False); self.refresh_chart(); self.refresh_quality()
     def refresh_chart(self):
-        if hasattr(self,'analytics'): self.analytics.set_data(self.store.get('tables',{}),self.pid(),self.calc_day(),self.snapshot)
+        if hasattr(self,'analytics'):
+            draft=self.current if self.current and self.current.get('revision')==self.store.get('revision') and self.current.get('date')==self.calc_day().isoformat() else None
+            self.analytics.set_data(self.store.get('tables',{}),self.pid(),self.calc_day(),self.snapshot,self.calculation_error,draft)
     def switch_stock_view(self,index):
         self.stock_views.setCurrentIndex(index)
         for i,tab in enumerate(self.stock_view_tabs): tab.setChecked(i==index)
@@ -215,6 +239,12 @@ class MainWindow(QMainWindow):
     def explain_stock(self):
         i=self.stock_table.currentRow()
         if 0<=i<len(self.visible_stock): self.show_explanation(self.visible_stock[i])
+    def open_stock_chart(self):
+        i=self.stock_table.currentRow()
+        if i<0 or i>=len(self.visible_stock): return
+        ingredient=self.visible_stock[i]['id']; panel=self.analytics.stock_timeline
+        panel.ingredient.setCurrentIndex(panel.ingredient.findData(ingredient)); self.navigate(0); self.switch_stock_view(0)
+        self.analytics.findChild(QScrollArea).ensureWidgetVisible(panel,0,0)
     def show_explanation(self,r):
         dialog=QDialog(self); dialog.setWindowTitle('Расчёт рекомендации'); dialog.resize(800,800); layout=QVBoxLayout(dialog); layout.setContentsMargins(28,25,28,24); layout.setSpacing(14)
         header=QHBoxLayout(); words=QVBoxLayout(); words.addWidget(label(r['name'],'title')); words.addWidget(label('Как получено количество к заказу','subtitle')); header.addLayout(words,1); layout.addLayout(header)
@@ -234,29 +264,18 @@ class MainWindow(QMainWindow):
         self.safe(self._edit_stock)
     def _edit_stock(self):
         tables=self.store.get('tables',{}); batches=[b for b in tables.get('batches',[]) if str(b['point'])==self.pid()]
+        selected=self.stock_table.currentRow()
+        if 0<=selected<len(self.visible_stock):
+            ingredient=self.visible_stock[selected]['id']; batches=[b for b in batches if str(b['ingredient'])==str(ingredient)]
         if not batches: raise DataError('Нет партий. Загрузите остатки.')
         names={str(i['id']):i['name'] for i in tables['items']}
-        dialog=QDialog(self); dialog.setWindowTitle('Сверка фактического остатка'); dialog.setMinimumWidth(540); form=QFormLayout(dialog)
-        combo=QComboBox()
-        for b in batches: combo.addItem(f'{names[str(b["ingredient"])]} · партия {b["id"]}',str(b['id']))
-        qty=QDoubleSpinBox(); qty.setRange(0,100000); qty.setDecimals(3)
-        usable=QCheckBox('Пригодность подтверждена по правилам точки')
-        mode=QComboBox(); mode.addItems(['Установить фактический остаток','Зарегистрировать списание'])
-        reason=QLineEdit(); reason.setPlaceholderText('Обязательная причина')
-        info=label('','subtitle'); info.setWordWrap(True)
-        def selected():
-            b=batches[combo.currentIndex()]; qty.setValue(float(b['qty'])); usable.setChecked(str(b['usable']).lower() in ('1','true'))
-            info.setText(f'Единица: {b["unit"]}. Сверка: {b["checked_at"]}\nЯвная дата использования: {b.get("use_before") or "не указана — приложение её не определяет"}')
-        combo.currentIndexChanged.connect(selected); selected()
-        form.addRow('Партия',combo); form.addRow(info); form.addRow('Действие',mode); form.addRow('Количество',qty); form.addRow(usable); form.addRow('Причина',reason)
-        buttons=QDialogButtonBox(QDialogButtonBox.StandardButton.Save|QDialogButtonBox.StandardButton.Cancel); buttons.accepted.connect(dialog.accept); buttons.rejected.connect(dialog.reject); form.addRow(buttons)
+        dialog=StockCorrectionDialog(self.store,batches,names,self.author(),self)
         if dialog.exec()==QDialog.DialogCode.Accepted:
-            self.store.correct_batch(combo.currentData(),qty.value(),usable.isChecked(),reason.text(),self.author(),mode.currentIndex()==1)
             self.stock_revision=None; self.stock_check.setChecked(False); self.reload(); self.status.setText('Изменение сохранено в журнале. Пересчитайте заявку; ручные правки сохранятся.')
 
     def build_order(self):
         box=self.page('Заявка на поставку','Проверьте рекомендацию, скорректируйте количество и сохраните в Excel')
-        recalc=button('Пересчитать',self.make_order); recalc.setIcon(svg_icon('refresh',BURGUNDY,18)); self.page_actions[1].addWidget(recalc)
+        self.recalc_btn=button('Пересчитать',self.make_order); self.recalc_btn.setIcon(svg_icon('refresh',BURGUNDY,18)); self.page_actions[1].addWidget(self.recalc_btn)
         self.cover=label('Сначала сформируйте заявку','success'); box.addWidget(self.cover)
         main=QHBoxLayout(); main.setSpacing(20); left=QVBoxLayout(); left.setSpacing(16)
         surface=QFrame(); surface.setObjectName('surface'); contents=QVBoxLayout(surface); contents.setContentsMargins(0,0,0,8); contents.setSpacing(0)
@@ -291,20 +310,23 @@ class MainWindow(QMainWindow):
         self.explain_order_btn.setText('Объяснить расчёт' if index==0 else 'Сравнение методов прогноза')
 
     def check_stock(self,checked):
-        if self.busy or not self.current: return
+        if self.busy or not self.current or self.current.get('confirmed_order_id'): return
         self.current['stock_confirmed']=checked
         self.current['stock_confirmed_at']=now() if checked else None
         self.current['stock_confirmed_revision']=self.store.get('revision') if checked else None
+        self.current['stock_confirmed_on']=date.today().isoformat() if checked else None
         self.save_current()
         self.confirm_btn.setEnabled(checked and not self.current.get('errors') and self.current.get('revision')==self.store.get('revision'))
     def save_current(self):
         if self.current: self.store.save_draft(self.pid(),self.current)
     def make_order(self): self.safe(self._make_order)
     def _make_order(self):
+        self.check_day()
         if not self.snapshot: raise DataError('Расчёт недоступен. Проверьте данные и график поставок.')
-        old=self.current or {}; edits=old.get('edits',{})
+        old=self.current or {}; edits=old.get('edits',{}) if not old.get('confirmed_order_id') else {}
         payload=calculate(self.store.get('tables'),self.pid(),self.calc_day(),self.store.get('settings',{}))
-        payload.update(edits=edits,revision=self.store.get('revision'),demo=self.store.get('demo'),author=self.author(),stock_confirmed=False)
+        payload.update(edits=edits,revision=self.store.get('revision'),demo=self.store.get('demo'),author=self.author(),stock_confirmed=False,
+                       draft_id=old.get('draft_id') if old.get('draft_id') and not old.get('confirmed_order_id') else uuid.uuid4().hex)
         valid={r['id'] for r in payload['rows']}
         orphan=set(edits)-valid
         if orphan: payload['errors'].append('Правки относятся к удаленным позициям: '+', '.join(orphan)+'. Нужна сверка справочника.')
@@ -317,10 +339,14 @@ class MainWindow(QMainWindow):
         if not hasattr(self,'order_table'): return
         self.busy=True
         p=self.current
+        confirmed=bool(p and p.get('confirmed_order_id'))
+        self.edit_order_btn.setEnabled(not confirmed); self.stock_check.setEnabled(not confirmed)
+        self.recalc_btn.setText('Новая заявка' if confirmed else 'Пересчитать')
+        self.confirm_btn.setText(f'Экспортировать №{p["confirmed_order_id"]}' if confirmed else 'Подтвердить и сохранить')
         if not p:
             self.cover.setText('Сначала сформируйте заявку'); fill(self.order_table,[]); fill(self.forecast_table,[]); self.order_warn.setText('Черновик ещё не создан.'); self.confirm_btn.setEnabled(False); self.busy=False; return
         self.cover.setText(f'Поставка {date.fromisoformat(p["arrival"]).strftime("%d.%m")}   ·   Покрытие на {p["days"]} дня: {date.fromisoformat(p["date"]).strftime("%d.%m")} — {date.fromisoformat(p["end"]).strftime("%d.%m")} (не включая)')
-        changed=p.get('revision')!=self.store.get('revision')
+        changed=p.get('revision')!=self.store.get('revision') or p.get('date')!=self.calc_day().isoformat() or (p.get('stock_confirmed') and p.get('stock_confirmed_on',p.get('date'))!=date.today().isoformat())
         errors=p.get('errors',[])
         warns=[]
         if changed: warns.append('Данные изменились. Пересчитайте перед подтверждением.')
@@ -330,6 +356,9 @@ class MainWindow(QMainWindow):
         if any(r['waste']>0 for r in p['rows']): warns.append('Есть фактические списания за 28 дней — проверьте излишки и редкий спрос. Дополнительный страховой запас не добавлен.')
         if any(r['unknown_dates'] for r in p['rows']): warns.append('Даты пригодности не заданы. Проверьте партии по действующим правилам точки.')
         self.order_warn.setText('\n\n'.join(warns) or 'Расчёт готов к проверке продавцом.')
+        if confirmed:
+            self.cover.setText(f'Заявка №{p["confirmed_order_id"]} сохранена · поставка {p["arrival"]} · отправка поставщику не подтверждена')
+            self.order_warn.setText('Состав заявки зафиксирован. Повторный экспорт использует тот же номер.\n\nДля нового расчёта нажмите «Новая заявка».')
         self.order_warn.setMinimumHeight(self.order_warn.heightForWidth(280))
         rendered=[]; total=0
         for r in p['rows']:
@@ -338,7 +367,8 @@ class MainWindow(QMainWindow):
         fill(self.order_table,rendered)
         fill(self.forecast_table,[[f['name'],fmt(f['expected'],0),f'{fmt(f["low"],0)}–{fmt(f["high"],0)}',f['segment'],f['method']] for f in p['forecasts']])
         self.total.setText(f'{fmt(total,0)} ₽'); self.stock_check.setChecked(bool(p.get('stock_confirmed')) and not changed)
-        self.confirm_btn.setEnabled(not errors and not changed and self.stock_check.isChecked()); self.busy=False
+        self.confirm_btn.setEnabled(confirmed or (not errors and not changed and self.stock_check.isChecked())); self.busy=False
+        self.refresh_chart()
     def explain_order(self):
         i=self.order_table.currentRow()
         if self.current and i>=0: self.show_explanation(self.current['rows'][i])
@@ -350,31 +380,29 @@ class MainWindow(QMainWindow):
     def edit_order(self): self.safe(self._edit_order)
     def _edit_order(self):
         i=self.order_table.currentRow()
-        if not self.current or i<0: return
+        if not self.current or i<0 or self.current.get('confirmed_order_id'): return
         r=self.current['rows'][i]; old=self.current.get('edits',{}).get(r['id'])
-        d=QDialog(self); d.setWindowTitle(r['name']); d.setMinimumWidth(470); form=QFormLayout(d)
-        form.addRow(label(f'Исходная рекомендация: {r["packs"]} уп. по {fmt(r["pack"])} {r["unit"]}'))
-        qty=QSpinBox(); qty.setRange(0,100000); qty.setValue(old['packs'] if old else r['packs'])
-        reason=QLineEdit(); reason.setPlaceholderText('Например: ожидается большой заказ'); form.addRow('Итого упаковок',qty); form.addRow('Причина',reason)
-        actions=QHBoxLayout(); actions.addWidget(button('Обнулить',lambda:qty.setValue(0))); actions.addWidget(button('Вернуть рекомендацию',lambda:qty.setValue(r['packs']))); form.addRow(actions)
-        bb=QDialogButtonBox(QDialogButtonBox.StandardButton.Save|QDialogButtonBox.StandardButton.Cancel); bb.accepted.connect(d.accept); bb.rejected.connect(d.reject); form.addRow(bb)
-        if d.exec()==QDialog.DialogCode.Accepted:
-            if not reason.text().strip(): raise DataError('Нужна причина ручного изменения')
-            edit={'packs':qty.value(),'reason':reason.text(),'author':self.author(),'at':now()}
+        def save(packs,reason):
+            edit={'packs':packs,'reason':reason,'author':self.author(),'at':now()}
             self.current.setdefault('edits',{})[r['id']]=edit
             with self.store.db:
-                self.store.log('Правка заявки',{'id':r['id'],'old':old,'recommended':r['packs']},edit,reason.text(),self.author())
+                self.store.log('Правка заявки',{'id':r['id'],'name':r['name'],'old':old,'recommended':r['packs']},edit,reason,self.author())
                 self.store.put('draft:'+self.pid(),self.current)
-            self.refresh_order()
+        dialog=QuantityDialog(self.current,r,old,save,self)
+        if dialog.exec()==QDialog.DialogCode.Accepted: self.refresh_order()
     def confirm_order(self): self.safe(self._confirm_order)
     def _confirm_order(self):
+        self.check_day()
         if not self.current: return
+        if self.current.get('confirmed_order_id'):
+            self.export_saved(self.store.get_order(self.current['confirmed_order_id'])); return
         if not self.stock_check.isChecked(): raise DataError('Сначала подтвердите сверку остатков и пригодности партий.')
         path,_=QFileDialog.getSaveFileName(self,'Экспорт подтверждённой заявки',str(Path.home()/'Desktop'/f'Заявка_{self.calc_day()}.xlsx'),'Excel (*.xlsx)')
         if not path: return
         if Path(path).suffix.lower()!='.xlsx': path+='.xlsx'
         p=json.loads(json.dumps(self.current)); p['author']=self.author(); p['confirmed_at']=now()
         id=self.store.confirm(self.pid(),p,self.author())
+        self.current=self.store.get('draft:'+self.pid()); self.refresh_order()
         try: export_order(path,p,id)
         except Exception:
             self.message(f'Заявка №{id} сохранена. Excel создать не удалось. Повторите экспорт из истории.'); raise
@@ -398,7 +426,7 @@ class MainWindow(QMainWindow):
         if not hasattr(self,'quality'): return
         tables=self.store.get('tables',{}); notes={'points':'Справочник точек','items':'Цена/себестоимость ₽ за учетную единицу; упаковка и целевой запас','sales':'Только закрытые смены; отсутствие не равно нулевому спросу','batches':'Факт по партиям; пригодность и время сверки обязательны','recipes':'Расход на порцию; версия и дата начала действия','deliveries':'Только подтвержденные; дата и количество','movements':'Журнал операций; не применяется повторно к фактическому остатку','schedules':'Ближайшая дата и интервал между поставками'}
         fill(self.quality,[[LABELS[k],len(tables.get(k,[])),notes[k]] for k in SCHEMAS])
-        errors=(self.snapshot or {}).get('errors',[])
+        errors=([self.calculation_error] if self.calculation_error else (self.snapshot or {}).get('errors',[]))
         self.import_report.setPlainText('Качество расчёта:\n'+ ('\n'.join(errors) if errors else 'Структурные ошибки не обнаружены. Пригодность, полнота продаж и корректность техкарт требуют проверки на точке.')+'\n\nПодключения Frontol / ДАЛИОН: адаптер не реализован, версии и форматы не согласованы.\nДаты партий необязательны и не выводятся из даты прихода. Незакрытые смены отклоняются.\nПустые ячейки не заменяются нулями. Пустой use_before означает неизвестную дату.\nДля нулевых продаж нужна явная строка; пропущенный день остаётся неизвестным.')
     def templates(self,demo):
         folder=QFileDialog.getExistingDirectory(self,'Папка для шаблонов')
@@ -427,27 +455,43 @@ class MainWindow(QMainWindow):
 
     def build_history(self):
         box=self.page('История и корректировки','Подтверждённые заявки и журнал изменений с автором, временем и причиной.')
-        row=QHBoxLayout(); row.addWidget(label('Сохранённые заявки','section')); row.addStretch(); row.addWidget(button('Экспортировать выбранную',self.export_history)); box.addLayout(row)
-        self.orders_table=table(['Заявка / точка','Дата и время','Статус','Правок']); self.orders_table.empty_text('Первой заявки пока нет','Подтвердите заявку на поставку — она сохранится здесь'); box.addWidget(self.orders_table,2)
+        row=QHBoxLayout(); row.addWidget(label('Заявки выбранной точки','section')); row.addStretch()
+        self.history_search=QLineEdit(); self.history_search.setPlaceholderText('Номер или дата'); self.history_search.textChanged.connect(self.reload_history); row.addWidget(self.history_search)
+        row.addWidget(button('Открыть',self.open_history)); row.addWidget(button('Экспортировать',self.export_history)); box.addLayout(row)
+        self.orders_table=table(['Заявка / точка','Сохранена','Поставка','Сумма, ₽','Статус','Правок']); self.orders_table.doubleClicked.connect(self.open_history); self.orders_table.empty_text('Первой заявки пока нет','Подтвердите заявку на поставку — она сохранится здесь'); box.addWidget(self.orders_table,2)
         box.addWidget(label('Журнал действий','section'))
         self.audit_table=table(['Действие','Время','Автор','Причина']); self.audit_table.empty_text('Изменений пока не было','Сверки, пересчёты и ручные правки будут записаны автоматически'); self.audit_table.doubleClicked.connect(self.audit_details); box.addWidget(self.audit_table,3)
     def reload_history(self):
-        self.orders=list(self.store.db.execute('SELECT id,created,point,status,payload FROM orders ORDER BY id DESC'))
-        fill(self.orders_table,[[f'№{r[0]} · {r[2]}',r[1][:19],r[3],len(json.loads(r[4]).get('edits',{}))] for r in self.orders])
+        if not hasattr(self,'orders_table'): return
+        names={str(p['id']):p['name'] for p in self.store.get('tables',{}).get('points',[])}
+        rows=list(self.store.db.execute('SELECT id,created,point,status,payload FROM orders WHERE point=? ORDER BY id DESC',(self.pid(),)))
+        query=self.history_search.text().strip().lower()
+        self.orders=[r for r in rows if not query or (str(r[0])==query.lstrip('№#') if query.lstrip('№#').isdigit() else query in f'{r[1]} {json.loads(r[4])["arrival"]}'.lower())]
+        fill(self.orders_table,[[f'№{r[0]} · {names.get(r[2],r[2])}',r[1][:19].replace('T',' '),json.loads(r[4])['arrival'],fmt(order_total(json.loads(r[4])),0),r[3],len(json.loads(r[4]).get('edits',{}))] for r in self.orders])
         self.audits=list(self.store.db.execute('SELECT kind,created,author,reason,before_json,after_json FROM audit ORDER BY id DESC LIMIT 300'))
         fill(self.audit_table,[[r[0],r[1][:19],r[2],r[3]] for r in self.audits])
     def audit_details(self):
         i=self.audit_table.currentRow()
         if i<0: return
         r=self.audits[i]; dialog=QDialog(self); dialog.setWindowTitle('Подробности изменения'); dialog.resize(750,540); layout=QVBoxLayout(dialog); text=QTextEdit(); text.setReadOnly(True)
-        text.setPlainText(f'{r[0]} · {r[1]} · {r[2]}\nПричина: {r[3]}\n\nДо:\n{json.dumps(json.loads(r[4]),ensure_ascii=False,indent=2)}\n\nПосле:\n{json.dumps(json.loads(r[5]),ensure_ascii=False,indent=2)}'); layout.addWidget(text); dialog.exec()
+        text.setPlainText(f'{r[0]} · {r[1][:19].replace("T"," ")} · {r[2]}\nПричина: {r[3]}\n\nБыло:\n{readable_change(json.loads(r[4]))}\n\nСтало:\n{readable_change(json.loads(r[5]))}'); layout.addWidget(text); dialog.exec()
     def export_history(self):
         i=self.orders_table.currentRow()
         if i<0: return
-        row=self.orders[i]; path,_=QFileDialog.getSaveFileName(self,'Повторный экспорт',f'Заявка_{row[0]}.xlsx','Excel (*.xlsx)')
+        self.export_saved(self.store.get_order(self.orders[i][0]))
+    def export_saved(self,order):
+        path,_=QFileDialog.getSaveFileName(self,'Повторный экспорт',f'Заявка_{order["id"]}.xlsx','Excel (*.xlsx)')
         if path:
             if Path(path).suffix.lower()!='.xlsx': path+='.xlsx'
-            self.safe(lambda:export_order(path,json.loads(row[4]),row[0]))
+            def save():
+                export_order(path,order['payload'],order['id']); self.status.setText(f'Заявка №{order["id"]} экспортирована: {path}')
+            self.safe(save)
+    def open_history(self):
+        i=self.orders_table.currentRow()
+        if i<0: return
+        order=self.store.get_order(self.orders[i][0])
+        name=next((p['name'] for p in self.store.get('tables',{}).get('points',[]) if str(p['id'])==order['point']),order['point'])
+        OrderDetailsDialog(order,name,self.export_saved,self).exec()
 
     def build_settings(self):
         box=self.page('Настройки','Параметры точки и правила расчёта под контролем продавца')
@@ -456,12 +500,18 @@ class MainWindow(QMainWindow):
         frame=QFrame(); frame.setObjectName('surface'); frame.setMaximumWidth(475); pane=QVBoxLayout(frame); pane.setContentsMargins(24,23,24,23); pane.setSpacing(18); pane.addWidget(label('Точка и прогноз','section')); form=QFormLayout(); form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows); form.setSpacing(9)
         settings=self.store.get('settings',{}); self.author_input=QLineEdit(settings.get('author','Продавец')); form.addRow('Имя для журнала изменений',self.author_input)
         self.date_input=QDateEdit(); self.date_input.setCalendarPopup(True); self.date_input.setDate(self.calc_day()); self.date_input.setDisplayFormat('dd.MM.yyyy'); form.addRow('Дата расчёта',self.date_input)
+        self.today_check=QCheckBox('Всегда использовать сегодняшнюю дату'); self.today_check.setChecked(settings.get('date_mode')!='manual')
+        self.date_input.setEnabled(not self.today_check.isChecked()); self.today_check.toggled.connect(lambda checked:self.date_input.setEnabled(not checked)); form.addRow(self.today_check)
         self.share_input=QDoubleSpinBox(); self.share_input.setRange(.1,1); self.share_input.setSingleStep(.05); self.share_input.setValue(settings.get('regular_share',.6)); form.addRow('Доля дней с продажами для регулярного спроса',self.share_input)
         self.recent_input=QSpinBox(); self.recent_input.setRange(7,90); self.recent_input.setValue(settings.get('recent_days',28)); form.addRow('Окно свежего спроса, наблюдений',self.recent_input)
         self.delivery_input=QDateEdit(); self.delivery_input.setCalendarPopup(True); self.delivery_input.setDisplayFormat('dd.MM.yyyy'); schedules=self.store.get('tables',{}).get('schedules',[])
         self.delivery_input.setDate(date.fromisoformat(str(schedules[0]['next_delivery'])) if schedules else date.today()+timedelta(days=1)); form.addRow('Ближайшая поставка',self.delivery_input)
         self.interval_input=QSpinBox(); self.interval_input.setRange(1,60); self.interval_input.setValue(int(float(schedules[0]['interval_days'])) if schedules else 3); form.addRow('Интервал между поставками, дней',self.interval_input)
-        pane.addLayout(form); technical=label('Значения демонстрации.\nПеред пилотом согласуйте их с заказчиком.','subtitle'); technical.setWordWrap(True); pane.addWidget(technical); pane.addStretch(); main.addWidget(frame,2)
+        pane.addLayout(form); technical=label('Проверьте график при переходе на новый день. Прошедшая поставка не переносится автоматически.','subtitle'); technical.setWordWrap(True); pane.addWidget(technical)
+        pane.addWidget(label('Резервные копии','section'))
+        pane.addWidget(button('Создать резервную копию',self.backup_data)); pane.addWidget(button('Восстановить из копии',self.restore_data))
+        self.backup_hint=label('Копия включает данные, заявки и журнал. Перед восстановлением текущая база сохраняется отдельно.','subtitle'); self.backup_hint.setWordWrap(True); pane.addWidget(self.backup_hint); pane.addStretch()
+        settings_scroll=QScrollArea(); settings_scroll.setWidgetResizable(True); settings_scroll.setFrameShape(QFrame.Shape.NoFrame); settings_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff); settings_scroll.setWidget(frame); main.addWidget(settings_scroll,2)
         right=QVBoxLayout(); right.setSpacing(14); right.addWidget(label('Ассортимент и упаковки','section'))
         self.item_settings=table(['Позиция','Ед.','Тара','Цель','Резерв / день']); self.item_settings.doubleClicked.connect(self.edit_item_setting); self.item_settings.empty_text('Ассортимент не загружен','Загрузите справочник items на экране «Данные»')
         surface=QFrame(); surface.setObjectName('surface'); tablebox=QVBoxLayout(surface); tablebox.setContentsMargins(0,0,0,0); tablebox.addWidget(self.item_settings); right.addWidget(surface,1); self.fill_item_settings()
@@ -474,7 +524,7 @@ class MainWindow(QMainWindow):
     def save_settings(self): self.safe(self._save_settings)
     def _save_settings(self):
         if not self.author_input.text().strip(): raise DataError('Введите имя продавца')
-        before=self.store.get('settings',{}); after={'author':self.author_input.text().strip(),'calculation_date':self.date_input.date().toPython().isoformat(),'regular_share':self.share_input.value(),'recent_days':self.recent_input.value()}
+        before=self.store.get('settings',{}); after={**before,'author':self.author_input.text().strip(),'date_mode':'today' if self.today_check.isChecked() else 'manual','calculation_date':self.date_input.date().toPython().isoformat(),'regular_share':self.share_input.value(),'recent_days':self.recent_input.value()}
         tables=self.store.get('tables',{}); schedule={'point':self.pid(),'next_delivery':self.delivery_input.date().toPython().isoformat(),'interval_days':self.interval_input.value()}
         previous=[r for r in tables.get('schedules',[]) if str(r['point'])==self.pid()]
         tables['schedules']=[r for r in tables.get('schedules',[]) if str(r['point'])!=self.pid()]+[schedule]
@@ -486,18 +536,42 @@ class MainWindow(QMainWindow):
     def _edit_item_setting(self):
         i=self.item_settings.currentRow()
         if i<0: return
-        item=self.config_items[i]; d=QDialog(self); d.setWindowTitle(item['name']); form=QFormLayout(d); fields={}
+        item=self.config_items[i]; d=QDialog(self); d.setWindowTitle(item['name']); layout=QVBoxLayout(d); form=QFormLayout(); layout.addLayout(form); fields={}
         for k,title in [('pack','Упаковка, '+item['unit']),('target','Целевой запас, '+item['unit']),('fallback','Резерв, порций/день')]:
             v=QDoubleSpinBox(); v.setDecimals(3); v.setRange(.001 if k=='pack' else 0,100000); v.setValue(float(item[k])); fields[k]=v; form.addRow(title,v)
         reason=QLineEdit(); form.addRow('Причина',reason)
-        bb=QDialogButtonBox(QDialogButtonBox.StandardButton.Save|QDialogButtonBox.StandardButton.Cancel); bb.accepted.connect(d.accept); bb.rejected.connect(d.reject); form.addRow(bb)
-        if d.exec()==QDialog.DialogCode.Accepted:
+        def save():
             if not reason.text().strip(): raise DataError('Укажите причину изменения')
             tables=self.store.get('tables'); before=dict(item); updated=next(x for x in tables['items'] if x['id']==item['id'])
             for k,v in fields.items(): updated[k]=v.value()
             with self.store.db:
                 self.store.put('tables',tables); self.store.put('revision',self.store.get('revision',0)+1); self.store.log('Параметры ассортимента',before,updated,reason.text(),self.author())
             self.fill_item_settings(); self.reload()
+        dialog_buttons(d,layout,save); d.exec()
+
+    def backup_data(self):
+        path,_=QFileDialog.getSaveFileName(self,'Сохранить резервную копию',f'Русские_блины_{date.today()}.sqlite3','База приложения (*.sqlite3)')
+        if path:
+            if not path.lower().endswith('.sqlite3'): path+='.sqlite3'
+            def save():
+                self.store.backup(path); self.backup_hint.setText('Копия проверена и сохранена:\n'+path)
+            self.safe(save)
+    def restore_data(self):
+        path,_=QFileDialog.getOpenFileName(self,'Восстановить резервную копию','','База приложения (*.sqlite3)')
+        if not path: return
+        answer=QMessageBox.question(self,'Восстановление базы','Текущие данные, черновики и история будут заменены выбранной копией. Перед заменой приложение сохранит текущую базу в папке backups.\n\nВосстановить выбранную копию?',QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No,QMessageBox.StandardButton.No)
+        if answer!=QMessageBox.StandardButton.Yes: return
+        def restore():
+            recovery=self.store.restore(path); self.store.sync_day()
+            self.point.blockSignals(True); self.point.clear()
+            for p in self.store.get('tables',{}).get('points',[]): self.point.addItem(p['name'],str(p['id']))
+            self.point.blockSignals(False)
+            settings=self.store.get('settings',{}); self.author_input.setText(settings.get('author','Продавец'))
+            self.today_check.setChecked(settings.get('date_mode')!='manual'); self.date_input.setDate(self.calc_day())
+            self.share_input.setValue(settings.get('regular_share',.6)); self.recent_input.setValue(settings.get('recent_days',28))
+            self.fill_item_settings(); self.point_changed(); self.reload_history()
+            self.backup_hint.setText('База восстановлена. Копия предыдущего состояния:\n'+str(recovery)); self.message('База восстановлена. Сверьте остатки и пересчитайте черновики.')
+        self.safe(restore)
 
 def main():
     application=QApplication(sys.argv); application.setApplicationName('RusskieBliny'); configure_application(application)
@@ -515,6 +589,7 @@ def main():
                         window.switch_stock_view(1); application.processEvents(); window.grab().save(str(folder/'inventory.png')); window.switch_stock_view(0)
                         window.analytics.mode_combo.setCurrentIndex(1); application.processEvents(); window.grab().save(str(folder/'months.png')); window.analytics.mode_combo.setCurrentIndex(0)
                         application.processEvents(); window.analytics.findChild(QScrollArea).widget().grab().save(str(folder/'overview-body.png'))
+                        window.analytics.stock_timeline.grab().save(str(folder/'stock-timeline.png'))
                         def capture_large_chart():
                             dialog=application.activeModalWidget()
                             if dialog: dialog.grab().save(str(folder/'large-chart.png')); dialog.accept()
@@ -532,7 +607,13 @@ def main():
                 window.refresh_order(); window.stock_check.setChecked(True); window.save_current()
                 order_id=store.confirm(window.pid(),window.current,'Smoke test')
                 export_order(folder/'packaged_order.xlsx',window.current,order_id)
-                (folder/'smoke-result.json').write_text(json.dumps({'status':'PASS','steps':['Qt screens','XLSX import','stock correction','forecast','manual edit','SQLite confirmation','Excel export'],'order_id':order_id,'time':now()},ensure_ascii=False,indent=2),encoding='utf-8')
+                assert store.confirm(window.pid(),window.current,'Smoke test')==order_id
+                store.backup(folder/'backup.sqlite3')
+                for dialog,name in [(QuantityDialog(window.current,window.current['rows'][0],None,lambda *args:None,window),'quantity-preview'),
+                                    (OrderDetailsDialog(store.get_order(order_id),'Центральная',lambda *args:None,window),'order-details')]:
+                    dialog.show(); application.processEvents(); dialog.grab().save(str(folder/(name+'.png'))); dialog.close()
+                window.refresh_order()
+                (folder/'smoke-result.json').write_text(json.dumps({'status':'PASS','steps':['Qt screens','XLSX import','stock correction','forecast','manual edit','idempotent confirmation','Excel export','daily stock projection','quantity preview','saved order details','SQLite backup'],'order_id':order_id,'time':now()},ensure_ascii=False,indent=2),encoding='utf-8')
                 window.navigate(1); application.processEvents(); window.grab().save(str(folder/'order.png'))
                 window.navigate(3); application.processEvents(); window.grab().save(str(folder/'history.png'))
                 application.quit()

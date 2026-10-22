@@ -30,6 +30,55 @@ def smooth_path(points):
         path.cubicTo(x+step,min(high,max(low,y+slopes[i]*step)),nx-step,min(high,max(low,ny-slopes[i+1]*step)),nx,ny)
     return path
 
+
+class StockProjectionChart(QWidget):
+    """Daily stock with explicit receipt steps; shortages never become fake stock."""
+    def __init__(self,parent=None):
+        super().__init__(parent); self.base=None; self.picked=None; self.unit=''; self.arrival=''; self.setMinimumHeight(300); self.setMouseTracking(True)
+    def set_data(self,base,picked,unit,arrival):
+        self.base=base; self.picked=picked; self.unit=unit; self.arrival=arrival; self.update()
+    def plot_rect(self): return QRectF(55,35,max(1,self.width()-80),max(1,self.height()-110))
+    def paintEvent(self,event):
+        p=QPainter(self); p.setRenderHint(QPainter.RenderHint.Antialiasing); rect=self.plot_rect()
+        if not self.base:
+            p.setFont(font(12)); p.setPen(QColor('#767383')); p.drawText(rect,Qt.AlignmentFlag.AlignCenter,'Для графика нужен актуальный расчёт'); return
+        all_points=self.base['points']+self.picked['points']; count=len(self.base['points'])
+        ymax=max([1]+[max(r['opening'],r['opening']-r['excluded']+r['incoming']+r['ordered']) for r in all_points])*1.15
+        xpos=lambda n:rect.left()+rect.width()*n/max(1,count)
+        ypos=lambda value:rect.bottom()-rect.height()*value/ymax
+        p.setFont(font(10)); p.setPen(QColor('#777381')); p.drawText(QPointF(rect.left(),18),f'Расчётный запас, {self.unit}')
+        for i in range(5):
+            value=ymax*i/4; y=ypos(value); p.setPen(QPen(QColor('#ECE9EE'),1)); p.drawLine(QPointF(rect.left(),y),QPointF(rect.right(),y))
+            p.setPen(QColor('#777381')); p.drawText(QRectF(0,y-8,rect.left()-10,18),Qt.AlignmentFlag.AlignRight,num(value,1))
+        for series,color,dashed in [(self.base,'#697080',True),(self.picked,BURGUNDY,False)]:
+            path=QPainterPath()
+            for i,row in enumerate(series['points']):
+                if i==0: path.moveTo(xpos(0),ypos(row['opening']))
+                path.lineTo(xpos(i+.08),ypos(row['opening']-row['excluded']))
+                path.lineTo(xpos(i+.08),ypos(row['opening']-row['excluded']+row['incoming']+row['ordered']))
+                path.lineTo(xpos(i+1),ypos(row['closing']))
+            pen=QPen(QColor(color),2.6); pen.setStyle(Qt.PenStyle.DashLine if dashed else Qt.PenStyle.SolidLine); p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush); p.drawPath(path)
+        for i,row in enumerate(self.picked['points']):
+            if row['incoming']+row['ordered']:
+                x=xpos(i+.08); p.setPen(QPen(QColor('#D2A2B2'),1,Qt.PenStyle.DotLine)); p.drawLine(QPointF(x,rect.top()),QPointF(x,rect.bottom()))
+                title=date.fromisoformat(row['date']).strftime('%d.%m')+' · поступление'
+                p.setPen(QColor(BURGUNDY)); p.drawText(QRectF(x-65,rect.top()-18,155,16),Qt.AlignmentFlag.AlignCenter,title)
+            if row['shortage']>1e-9:
+                p.setPen(QPen(QColor('white'),2)); p.setBrush(QColor(BURGUNDY)); p.drawEllipse(QPointF(xpos(i+1),ypos(row['closing'])),4,4)
+        p.setFont(font(10)); p.setPen(QColor('#777381'))
+        for i in sorted(set([0]+[round(j*count/5) for j in range(1,6)])):
+            value='Начало' if i==0 else date.fromisoformat(self.picked['points'][i-1]['date']).strftime('%d.%m')
+            p.drawText(QRectF(xpos(i)-25,rect.bottom()+9,50,18),Qt.AlignmentFlag.AlignCenter,value)
+        for x,title,color,dashed in [(rect.left(),'Без нового заказа','#697080',True),(rect.left()+220,'С выбранным заказом',BURGUNDY,False)]:
+            y=self.height()-23; pen=QPen(QColor(color),2); pen.setStyle(Qt.PenStyle.DashLine if dashed else Qt.PenStyle.SolidLine); p.setPen(pen); p.drawLine(QPointF(x,y),QPointF(x+22,y)); p.setPen(QColor('#555968')); p.drawText(QPointF(x+30,y+4),title)
+    def mouseMoveEvent(self,event):
+        rect=self.plot_rect()
+        if not self.picked or not rect.contains(event.position()): QToolTip.hideText(); return
+        index=min(len(self.picked['points'])-1,max(0,int((event.position().x()-rect.left())/rect.width()*len(self.picked['points']))))
+        row=self.picked['points'][index]
+        QToolTip.showText(event.globalPosition().toPoint(),f'{row["date"]} · на конец дня\nЗапас: {num(row["closing"],2)} {self.unit}\nРасход: {num(row["demand"],2)} {self.unit}\nВ пути: {num(row["incoming"],2)} {self.unit}\nВыбранный заказ: {num(row["ordered"],2)} {self.unit}\nНе хватит: {num(row["shortage"],2)} {self.unit}',self)
+    def leaveEvent(self,event): QToolTip.hideText()
+
 class SalesChart(QWidget):
     def __init__(self,parent=None):
         super().__init__(parent); self.payload=None; self.monthly=False; self.hover=None; self.setMouseTracking(True); self.setMinimumHeight(320)
@@ -146,7 +195,7 @@ class CoverageChart(QWidget):
         p=QPainter(self); p.setRenderHint(QPainter.RenderHint.Antialiasing); left=min(187,self.width()*.32); right=self.width()-54; width=right-left
         p.setFont(font(11))
         if not self.rows:
-            p.setPen(QColor('#92909D')); p.drawText(self.rect(),Qt.AlignmentFlag.AlignCenter,'Нужны остатки и технологические карты'); return
+            p.setPen(QColor('#92909D')); p.drawText(self.rect(),Qt.AlignmentFlag.AlignCenter|Qt.TextFlag.TextWordWrap,getattr(self,'empty_message','Расчёт покрытия недоступен')); return
         for i,r in enumerate(self.rows):
             y=27+i*27
             if self.hover==i: p.fillRect(QRectF(0,y-14,self.width(),27),QColor('#FCF4F6'))

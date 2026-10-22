@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (QWidget,QFrame,QLabel,QPushButton,QComboBox,QVBox
 from charts import SalesChart,CoverageChart,MixChart,num
 from analytics_data import make_analytics
 from ui_theme import svg_icon,BURGUNDY
+from workflows import StockTimelinePanel
 
 def text(value,kind='subtitle'):
     widget=QLabel(value); widget.setObjectName(kind); return widget
@@ -30,7 +31,7 @@ class AnalyticsPanel(QWidget):
         for name in ['Продано за период','Среднее за день','Самый активный день','Спрос к пополнению']:
             slot=QVBoxLayout(); slot.setSpacing(3); caption=text(name); value=text('—','chartMetric'); hint=text('','metricHint')
             slot.addWidget(caption); slot.addWidget(value); slot.addWidget(hint); metrics.addLayout(slot,1); self.metric_labels.append(caption); self.metric_values.append(value); self.metric_hints.append(hint)
-        content.addLayout(metrics)
+        self.scope=text('','section'); content.addWidget(self.scope); content.addLayout(metrics)
         hero,hero_box=card(); heading=QHBoxLayout(); titlebox=QVBoxLayout(); titlebox.setSpacing(4); self.hero_title=text('Продажи и прогноз','chartTitle'); self.date_range=text('Закрытые смены'); titlebox.addWidget(self.hero_title); titlebox.addWidget(self.date_range); heading.addLayout(titlebox,1)
         self.dish_combo=QComboBox(); self.dish_combo.setMinimumWidth(230); self.dish_combo.currentIndexChanged.connect(self.refresh); heading.addWidget(self.dish_combo)
         self.mode_combo=QComboBox(); self.mode_combo.addItems(['Динамика и прогноз','Сравнение месяцев']); self.mode_combo.setMinimumWidth(202); self.mode_combo.currentIndexChanged.connect(self.refresh); heading.addWidget(self.mode_combo)
@@ -52,15 +53,18 @@ class AnalyticsPanel(QWidget):
         self.mix_chart=MixChart(); self.mix_chart.dishSelected.connect(self.select_dish); mix_box.addWidget(self.mix_chart,1)
         hint=text('Нажмите на блюдо, чтобы посмотреть его динамику','metricHint'); hint.setWordWrap(True); mix_box.addWidget(hint); bottom.addWidget(mix,4)
         content.addLayout(bottom,4)
+        self.stock_timeline=StockTimelinePanel(); content.addWidget(self.stock_timeline)
     def set_period(self,days): self.days=days; self.refresh()
     def select_dish(self,id):
         index=self.dish_combo.findData(id)
         if index>=0: self.dish_combo.setCurrentIndex(index)
-    def set_data(self,tables,point,day,snapshot):
-        self.tables=tables; self.point=point; self.day=day; self.snapshot=snapshot; self.refresh()
+    def set_data(self,tables,point,day,snapshot,error=None,draft=None):
+        self.tables=tables; self.point=point; self.day=day; self.snapshot=snapshot; self.error=error
+        self.stock_timeline.set_snapshot(snapshot,draft,error); self.refresh()
     def refresh(self):
         if not self.tables: return
         monthly=self.mode_combo.currentIndex()==1
+        self.scope.setText('Показатели блюда · '+self.dish_combo.currentText())
         for index,button in enumerate(self.period_buttons): button.setChecked((14,30,90)[index]==self.days); button.setEnabled(not monthly)
         self.payload=make_analytics(self.tables,self.point,str(self.dish_combo.currentData()),self.day,self.days,self.snapshot,monthly)
         p=self.payload; start=date.fromisoformat(p['start']).strftime('%d.%m'); end=date.fromisoformat(p['end']).strftime('%d.%m')
@@ -85,7 +89,7 @@ class AnalyticsPanel(QWidget):
         self.mix_period.setText('Доли продаж за три завершённых месяца' if monthly else f'Доли продаж за последние {self.days} дней')
         missing=p['length']-p['observed']; stockout=sum(v['available'] is False for v in p['actual'])
         hints=[]
-        last=(self.snapshot or {}).get('last_closed')
+        last=p['last_closed']
         if last:
             stale=(max(self.day,date.today())-date.fromisoformat(last)).days>1
             hints.append(('Данные устарели. ' if stale else '')+'Закрытые смены до '+date.fromisoformat(last).strftime('%d.%m.%Y'))
@@ -96,6 +100,9 @@ class AnalyticsPanel(QWidget):
         if forecast and forecast['method']=='Ручной резерв': hints.append('Короткая история: прогноз использует ручной резерв')
         self.history_hint.setText(' · '.join(hints) if hints else 'На графике показаны подтверждённые продажи закрытых смен')
         self.coverage_hint.setText(f'Показано 7 из {p["coverage_count"]} ингредиентов. Нажмите для расчёта' if p['coverage_count']>7 else 'Нажмите на ингредиент для расчёта. Дефицит до доставки проверяйте в заявке')
+        if not self.snapshot:
+            self.coverage_hint.setText(self.error or 'Расчёт покрытия недоступен')
+            self.coverage_chart.empty_message=self.error or 'Для покрытия нужен расчёт потребности'
     def fullscreen(self):
         if not self.payload: return
         dialog=QDialog(self); dialog.setWindowTitle('КРОНА · '+self.dish_combo.currentText()); screen=QApplication.primaryScreen().availableGeometry(); dialog.resize(min(1350,screen.width()-70),min(800,screen.height()-90))

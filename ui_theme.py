@@ -119,6 +119,10 @@ QSpinBox::up-arrow,QDoubleSpinBox::up-arrow { image: url("__ICONS__/chevron-up.s
 QSpinBox::down-arrow,QDoubleSpinBox::down-arrow { image: url("__ICONS__/chevron-down.svg"); width: 11px; height: 11px; }
 QComboBox QAbstractItemView { background: white; border: 1px solid #E9E8ED; padding: 5px; selection-background-color: #F9E8EB; }
 QTextEdit { background: white; border: 1px solid #E9E8ED; border-radius: 8px; padding: 12px; selection-background-color: #F9E8EB; }
+QTabWidget::pane { border: 1px solid #E9E8ED; background: white; border-radius: 10px; }
+QTabBar::tab { background: transparent; color: #747786; padding: 12px 17px; border-bottom: 2px solid transparent; }
+QTabBar::tab:selected { color: #A4002A; border-bottom: 2px solid #A4002A; }
+QTabBar::tab:hover { background: #FCF3F4; }
 QTableWidget { border: none; background: white; alternate-background-color: #FCFBFC; selection-background-color: #FCF3F4; selection-color: #111E30; outline: none; }
 QTableWidget::item { padding: 0 12px; border-bottom: 1px solid #F0EFF3; }
 QTableWidget::item:selected { background: #FCF3F4; color: #111E30; }

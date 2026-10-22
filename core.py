@@ -9,6 +9,8 @@ import math
 import random
 import sqlite3
 import statistics as st
+import uuid
+import tempfile
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -18,6 +20,10 @@ def now():
 
 def year_start(d):
     return d.replace(year=d.year-1, day=min(d.day, calendar.monthrange(d.year-1,d.month)[1]))
+
+def calculation_day(settings, today=None):
+    today=today or date.today()
+    return date.fromisoformat(settings['calculation_date']) if settings.get('date_mode')=='manual' else today
 
 SCHEMAS = {
     'points': ['id','name'],
@@ -163,6 +169,23 @@ class Store:
         CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY,created TEXT,author TEXT,kind TEXT,reason TEXT,before_json TEXT,after_json TEXT);
         CREATE TABLE IF NOT EXISTS orders(id INTEGER PRIMARY KEY,created TEXT,point TEXT,status TEXT,payload TEXT);
         ''')
+        if 'draft_id' not in {r[1] for r in self.db.execute('PRAGMA table_info(orders)')}:
+            self.db.execute('ALTER TABLE orders ADD COLUMN draft_id TEXT')
+        self.db.execute('CREATE UNIQUE INDEX IF NOT EXISTS order_draft ON orders(point,draft_id) WHERE draft_id IS NOT NULL')
+        # Recognize confirmations created by versions that did not mark the saved draft.
+        for key,raw in self.db.execute("SELECT key,value FROM state WHERE key LIKE 'draft:%'").fetchall():
+            draft=json.loads(raw)
+            if draft.get('draft_id'): continue
+            ignored={'author','confirmed_at','confirmed_order_id','draft_id'}
+            comparable={k:v for k,v in draft.items() if k not in ignored}
+            token=uuid.uuid4().hex
+            for order_id,order_raw in self.db.execute('SELECT id,payload FROM orders WHERE point=? ORDER BY id DESC',(key[6:],)).fetchall():
+                saved=json.loads(order_raw)
+                if comparable=={k:v for k,v in saved.items() if k not in ignored}:
+                    draft=saved; draft['confirmed_order_id']=order_id; draft['draft_id']=token
+                    self.db.execute('UPDATE orders SET draft_id=?,payload=? WHERE id=?',(token,json.dumps(draft,ensure_ascii=False),order_id))
+                    break
+            draft.setdefault('draft_id',token); self.put(key,draft)
         self.db.commit()
     def get(self,key,default=None):
         row=self.db.execute('SELECT value FROM state WHERE key=?',(key,)).fetchone()
@@ -206,7 +229,18 @@ class Store:
             self.put('seeded_demo',True)
             self.put('import_time',now())
             self.put('revision',1)
-            self.put('settings',{'regular_share':0.6,'recent_days':28,'author':'Продавец','calculation_date':date.today().isoformat()})
+            self.put('settings',{'regular_share':0.6,'recent_days':28,'author':'Продавец','date_mode':'today','calculation_date':date.today().isoformat()})
+            self.put('active_day',date.today().isoformat())
+    def sync_day(self, today=None):
+        today=(today or date.today()).isoformat()
+        previous=self.get('active_day')
+        if previous==today: return False
+        with self.db:
+            self.put('active_day',today)
+            self.put('revision',self.get('revision',0)+1)
+            if previous:
+                self.log('Новый рабочий день',previous,today,'Требуется актуальный расчёт и повторная сверка','Приложение')
+        return True
     def correct_batch(self,batch_id,qty,usable,reason,author,writeoff=False):
         if not reason.strip(): raise DataError('Укажите причину')
         qty=number(qty,'Количество')
@@ -227,15 +261,91 @@ class Store:
             self.put('revision',self.get('revision',0)+1)
             self.log('Списание' if writeoff else 'Сверка остатка',before,batch,reason,author)
     def save_draft(self,point,payload):
+        payload.setdefault('draft_id',uuid.uuid4().hex)
         with self.db: self.put('draft:'+point,payload)
+    def get_order(self, order_id):
+        row=self.db.execute('SELECT id,created,point,status,payload FROM orders WHERE id=?',(order_id,)).fetchone()
+        if not row: raise DataError('Сохранённая заявка не найдена')
+        return dict(id=row[0],created=row[1],point=row[2],status=row[3],payload=json.loads(row[4]))
     def confirm(self,point,payload,author):
-        if payload.get('revision')!=self.get('revision'): raise DataError('Данные изменились. Пересчитайте заявку: ручные правки сохранятся.')
-        if payload.get('errors'): raise DataError('Сначала устраните ошибки расчета')
-        if not payload.get('stock_confirmed') or payload.get('stock_confirmed_revision')!=self.get('revision'): raise DataError('Подтвердите сверку фактических остатков')
+        payload.setdefault('draft_id',uuid.uuid4().hex)
+        # Serialize confirmation with revision checks and the draft marker in one transaction.
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            existing=self.db.execute('SELECT id,payload FROM orders WHERE point=? AND draft_id=?',(point,payload['draft_id'])).fetchone()
+            if existing:
+                self.db.commit()
+                payload.clear(); payload.update(json.loads(existing[1])); payload['confirmed_order_id']=existing[0]
+                return existing[0]
+            if str(payload.get('point'))!=str(point): raise DataError('Заявка относится к другой торговой точке')
+            if payload.get('revision')!=self.get('revision'): raise DataError('Данные изменились. Пересчитайте заявку: ручные правки сохранятся.')
+            if payload.get('date')!=calculation_day(self.get('settings',{})).isoformat(): raise DataError('Дата расчёта изменилась. Пересчитайте заявку и сверьте остатки.')
+            if payload.get('errors'): raise DataError('Сначала устраните ошибки расчета')
+            if not payload.get('stock_confirmed') or payload.get('stock_confirmed_revision')!=self.get('revision'): raise DataError('Подтвердите сверку фактических остатков')
+            if payload.get('stock_confirmed_on',payload.get('date'))!=date.today().isoformat(): raise DataError('Начался новый день. Повторно сверьте остатки.')
+            saved=json.loads(json.dumps(payload)); saved.update(author=author,confirmed_at=now())
+            cur=self.db.execute('INSERT INTO orders(created,point,status,payload,draft_id) VALUES(?,?,?,?,?)',(now(),point,'Подтверждена',json.dumps(saved,ensure_ascii=False),payload['draft_id']))
+            saved['confirmed_order_id']=cur.lastrowid
+            self.db.execute('UPDATE orders SET payload=? WHERE id=?',(json.dumps(saved,ensure_ascii=False),cur.lastrowid))
+            self.put('draft:'+point,saved)
+            self.log('Подтверждение заявки',None,{'order':cur.lastrowid,'payload':saved},'Подтверждено продавцом',author)
+            self.db.commit()
+            payload.update(saved)
+            return cur.lastrowid
+        except Exception:
+            self.db.rollback()
+            raise
+    def backup(self, destination):
+        destination=Path(destination).resolve()
+        if destination==self.path.resolve(): raise DataError('Выберите отдельный файл для резервной копии')
+        destination.parent.mkdir(parents=True,exist_ok=True)
+        handle=tempfile.NamedTemporaryFile(prefix='backup-',suffix='.sqlite3',dir=destination.parent,delete=False)
+        temp=Path(handle.name); handle.close()
+        try:
+            copied=sqlite3.connect(temp)
+            try:
+                self.db.backup(copied)
+                if copied.execute('PRAGMA integrity_check').fetchone()[0]!='ok': raise DataError('Не удалось проверить резервную копию')
+            finally: copied.close()
+            temp.replace(destination)
+        finally:
+            temp.unlink(missing_ok=True)
+        return destination
+    def restore(self, source):
+        source=Path(source).resolve()
+        if source==self.path.resolve(): raise DataError('Выберите файл резервной копии, а не открытую базу')
+        try:
+            copied=sqlite3.connect(source.as_uri()+'?mode=ro',uri=True)
+            try:
+                if copied.execute('PRAGMA integrity_check').fetchone()[0]!='ok': raise DataError('Резервная копия повреждена')
+                required={'state','orders','audit','imports'}
+                names={r[0] for r in copied.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+                if not required<=names: raise DataError('Это не резервная копия приложения')
+                columns={'state':{'key','value'},'orders':{'id','created','point','status','payload'},
+                         'audit':{'id','created','author','kind','reason','before_json','after_json'},'imports':{'hash','name','created'}}
+                for table,expected in columns.items():
+                    if not expected<={r[1] for r in copied.execute(f'PRAGMA table_info({table})')}: raise DataError('Структура резервной копии не поддерживается')
+                tables=json.loads(copied.execute("SELECT value FROM state WHERE key='tables'").fetchone()[0])
+                if not isinstance(tables,dict): raise DataError('В резервной копии нет таблиц приложения')
+                validate(tables)
+                for (raw,) in copied.execute('SELECT payload FROM orders'):
+                    payload=json.loads(raw)
+                    if not isinstance(payload,dict) or not {'date','arrival','end','rows','forecasts'}<=payload.keys(): raise DataError('В копии повреждена сохранённая заявка')
+                for (raw,) in copied.execute('SELECT before_json FROM audit UNION ALL SELECT after_json FROM audit'):
+                    json.loads(raw)
+                # Keep a recoverable copy before replacing any working data.
+                recovery=self.path.parent/'backups'/f'before-restore-{datetime.now():%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:6]}.sqlite3'
+                self.backup(recovery)
+                copied.backup(self.db)
+            finally: copied.close()
+        except (sqlite3.Error,TypeError,json.JSONDecodeError) as e:
+            raise DataError('Не удалось прочитать резервную копию: '+str(e)) from e
+        # Apply migrations after restoring an older supported database.
+        self.db.close(); self.__init__(self.path)
         with self.db:
-            cur=self.db.execute('INSERT INTO orders(created,point,status,payload) VALUES(?,?,?,?)',(now(),point,'Подтверждена',json.dumps(payload,ensure_ascii=False)))
-            self.log('Подтверждение заявки',None,{'order':cur.lastrowid,'payload':payload},'Подтверждено продавцом',author)
-        return cur.lastrowid
+            self.put('revision',self.get('revision',0)+1)
+            self.log('Восстановление базы',None,{'backup':source.name,'recovery':str(recovery)},'Восстановлена резервная копия','Приложение')
+        return recovery
 
 def demo_data(today=None):
     today=today or date.today()
@@ -329,6 +439,38 @@ def active_recipes(tables,dish,day):
     if len(versions)>1: raise DataError(f'{dish}: несколько версий техкарты на одну дату')
     return [r for r in candidates if str(r['valid_from'])==latest]
 
+def inventory_projection(inputs, days, demand, arrival, order_qty=0):
+    """Daily available stock, FEFO use, and unmet demand; no invented expiry."""
+    pool=[dict(b) for b in inputs['batches']]
+    lost=0.; shortage_before=0.; unmet=0.; points=[]
+    for j,d in enumerate(days):
+        excluded=0.
+        opening=sum(b['qty'] for b in pool)
+        for b in pool:
+            if b['expires']<d.isoformat(): excluded+=b['qty']; b['qty']=0.
+        lost+=excluded
+        incoming=sum(r['qty'] for r in inputs['arrivals'] if r['date']==d.isoformat())
+        ordered=order_qty if d==arrival else 0.
+        if incoming+ordered: pool.append({'qty':incoming+ordered,'expires':'9999-12-31'})
+        need=demand[j]
+        for b in sorted(pool,key=lambda b:b['expires']):
+            used=min(b['qty'],need); b['qty']-=used; need-=used
+        unmet+=need
+        if d<arrival: shortage_before+=need
+        points.append(dict(date=d.isoformat(),opening=opening,incoming=incoming,ordered=ordered,
+                           demand=demand[j],closing=sum(b['qty'] for b in pool),shortage=need,excluded=excluded))
+    return dict(points=points,excluded=lost,shortage_before=shortage_before,shortage=unmet,
+                closing=points[-1]['closing'] if points else sum(b['qty'] for b in pool))
+
+def order_impact(payload, row, packs):
+    days=[date.fromisoformat(payload['date'])+timedelta(days=i) for i in range(payload['days'])]
+    if 'inventory_inputs' not in row or 'daily_demand' not in row:
+        raise DataError('Для этого старого расчёта график по дням не сохранён. Создайте новый расчёт.')
+    projection=inventory_projection(row['inventory_inputs'],days,row['daily_demand'],date.fromisoformat(payload['arrival']),packs*row['pack'])
+    projection.update(packs=packs,quantity=packs*row['pack'],cost=packs*row['pack']*row['cost'],
+                      target_gap=max(0,row['target']-projection['closing']))
+    return projection
+
 def calculate(tables,point,day,settings):
     schedules=[r for r in tables.get('schedules',[]) if str(r['point'])==point]
     if not schedules: raise DataError('Нет графика поставок для этой точки')
@@ -361,18 +503,10 @@ def calculate(tables,point,day,settings):
         blocked=sum(float(b['qty']) for b in batches if not flag(b['usable'],'usable'))
         arrivals=[r for r in tables.get('deliveries',[]) if str(r['point'])==point and str(r['ingredient'])==ing and flag(r['confirmed'],'confirmed') and day<=date.fromisoformat(str(r['arrival']))<end]
         late=[r for r in tables.get('deliveries',[]) if str(r['point'])==point and str(r['ingredient'])==ing and flag(r['confirmed'],'confirmed') and date.fromisoformat(str(r['arrival']))<day]
-        pool=[{'qty':float(b['qty']),'expires':str(b.get('use_before') or '9999-12-31')} for b in usable]
-        lost=0.; shortage_before=0.; unmet=0.
-        for j,d in enumerate(days):
-            for b in pool:
-                if b['expires']<d.isoformat(): lost+=b['qty']; b['qty']=0
-            for r in arrivals:
-                if str(r['arrival'])==d.isoformat(): pool.append({'qty':float(r['qty']),'expires':'9999-12-31'})
-            need=demand[j]
-            for b in sorted(pool,key=lambda b:b['expires']):
-                used=min(b['qty'],need); b['qty']-=used; need-=used
-            unmet+=need
-            if d<arrival: shortage_before+=need
+        inputs={'batches':[{'qty':float(b['qty']),'expires':str(b.get('use_before') or '9999-12-31')} for b in usable],
+                'arrivals':[{'date':str(r['arrival']),'qty':float(r['qty'])} for r in arrivals]}
+        projection=inventory_projection(inputs,days,demand,arrival)
+        lost=projection['excluded']; shortage_before=projection['shortage_before']; unmet=projection['shortage']
         stock=sum(float(b['qty']) for b in usable)
         incoming=sum(float(r['qty']) for r in arrivals)
         # Remove only unused quantities whose explicitly supplied date precedes use.
@@ -387,7 +521,8 @@ def calculate(tables,point,day,settings):
         result.append(dict(id=ing,name=item['name'],unit=item['unit'],demand=demand_total,stock=stock,effective=effective,incoming=incoming,target=float(item['target']),pack=pack,packs=packs,
             ordered=packs*pack,rounding=packs*pack-raw,surplus=surplus,blocked=blocked,expiry_excluded=lost,shortage_before=shortage_before,
             timing_gap=max(0,unmet-raw),waste=waste,cost=float(item['cost']),portion_rate=rate,contributions=contributions[ing],late=len(late),
-            checked_at=min([str(b['checked_at']) for b in batches],default='Нет сверки'),unknown_dates=sum(not b.get('use_before') for b in usable)))
+            checked_at=min([str(b['checked_at']) for b in batches],default='Нет сверки'),unknown_dates=sum(not b.get('use_before') for b in usable),
+            inventory_inputs=inputs,daily_demand=demand,projection=projection))
     closed=[str(r['date']) for r in tables.get('sales',[]) if str(r['point'])==point and flag(r['closed'],'closed') and str(r['date'])<day.isoformat()]
     return dict(point=point,date=day.isoformat(),end=end.isoformat(),arrival=arrival.isoformat(),days=len(days),rows=result,forecasts=forecasts,errors=list(dict.fromkeys(errors)),last_closed=max(closed) if closed else None,created=now())
 

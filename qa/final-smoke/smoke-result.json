@@ -6,9 +6,13 @@
     "stock correction",
     "forecast",
     "manual edit",
-    "SQLite confirmation",
-    "Excel export"
+    "idempotent confirmation",
+    "Excel export",
+    "daily stock projection",
+    "quantity preview",
+    "saved order details",
+    "SQLite backup"
   ],
   "order_id": 1,
-  "time": "2026-10-21T22:40:26+07:00"
+  "time": "2026-10-22T21:39:19+07:00"
 }

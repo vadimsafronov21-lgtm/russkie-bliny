@@ -1,94 +1,26 @@
 {
-  "generated": "2026-10-21T22:38:31+07:00",
+  "generated": "2026-10-22T21:40:46+07:00",
   "environment": "Windows 11, Python 3.13, Qt 6.12",
   "end_to_end": [
+    "Qt screens",
     "XLSX import",
-    "stock correction with reason",
-    "local forecast",
-    "manual edit kept separate",
-    "draft persisted",
-    "confirmed order persisted",
-    "Excel reopened in tests"
+    "stock correction",
+    "forecast",
+    "manual edit",
+    "idempotent confirmation",
+    "Excel export",
+    "daily stock projection",
+    "quantity preview",
+    "saved order details",
+    "SQLite backup"
   ],
-  "calculation_seconds": 0.383,
+  "calculation_seconds": 0.378,
   "training_window": "last 12 calendar months, strictly before calculation day",
-  "last_closed_shift": "2026-10-20",
+  "last_closed_shift": "2026-10-21",
   "coverage_days": 4,
   "data": "synthetic demonstration; no measured economic effect",
-  "forecasts": [
-    {
-      "name": "Блин со сметаной",
-      "segment": "Регулярный",
-      "method": "День недели",
-      "expected": 110.0,
-      "low": 96.47375944049976,
-      "high": 123.52624055950024,
-      "scores": {
-        "Среднее": 5.686841219069415,
-        "День недели": 4.883928571428571,
-        "Свежий спрос": 6.0044235793088125,
-        "Редкий спрос": 6.101547199287954
-      }
-    },
-    {
-      "name": "Блин с курицей и сыром",
-      "segment": "Регулярный",
-      "method": "День недели",
-      "expected": 177.5,
-      "low": 163.37320536956057,
-      "high": 191.62679463043943,
-      "scores": {
-        "Среднее": 6.638705407495959,
-        "День недели": 4.40625,
-        "Свежий спрос": 6.183842338809051,
-        "Редкий спрос": 6.396196078804842
-      }
-    },
-    {
-      "name": "Блин с ветчиной и сыром",
-      "segment": "Регулярный",
-      "method": "День недели",
-      "expected": 139.75,
-      "low": 126.7256899199526,
-      "high": 152.7743100800474,
-      "scores": {
-        "Среднее": 4.778278809797747,
-        "День недели": 4.705357142857143,
-        "Свежий спрос": 5.3713792015331,
-        "Редкий спрос": 5.4631556594619255
-      }
-    },
-    {
-      "name": "Блин с вишней",
-      "segment": "Регулярный",
-      "method": "День недели",
-      "expected": 83.0,
-      "low": 71.48182447837598,
-      "high": 94.51817552162402,
-      "scores": {
-        "Среднее": 4.651545933410202,
-        "День недели": 3.8839285714285716,
-        "Свежий спрос": 4.826982577007601,
-        "Редкий спрос": 4.916859534307789
-      }
-    },
-    {
-      "name": "Блин с икрой",
-      "segment": "Редкий",
-      "method": "Свежий спрос",
-      "expected": 8.744581029979585,
-      "low": 4.017326142044071,
-      "high": 13.471835917915099,
-      "scores": {
-        "Среднее": 1.9794830206900338,
-        "День недели": 1.9776785714285714,
-        "Свежий спрос": 1.8747778696639694,
-        "Редкий спрос": 1.8792086204146423
-      }
-    }
-  ],
   "tests": {
-    "passed": 47,
+    "passed": 68,
     "failed": 0,
     "skipped": 0
   },
@@ -100,20 +32,39 @@
       "stock correction",
       "forecast",
       "manual edit",
-      "SQLite confirmation",
-      "Excel export"
+      "idempotent confirmation",
+      "Excel export",
+      "daily stock projection",
+      "quantity preview",
+      "saved order details",
+      "SQLite backup"
     ],
     "order_id": 1,
-    "time": "2026-10-21T22:40:26+07:00"
+    "time": "2026-10-22T21:39:19+07:00"
   },
-  "binary_sha256": "a78ee0143cbc55ff9be7a03e07ea211e30b2b983c0f1743fb0eb7be808cfed15",
+  "binary_sha256": "82332e36b7ec56ca321b79752354ee8effea36e8bd44d67d36a756ee1e874a8c",
   "source_sha256": {
-    "app.py": "829b1077d64e1994b7230b3bfba6f667217bda838ce5e04ebd6d5931083553c3",
-    "core.py": "8eeb9b0e539a70fb866c97c3c08c994dd64e35e6f8dc467bc735901ed0f68f06",
-    "ui_theme.py": "af6de2390cb9f5749d3626d6b19c42e1d7c64923b6f32f777f4e3fbc918d0b3c",
-    "charts.py": "a2221f1dfc1f38a4b7cb1c347783bdb7a92fec20749c2f58937ad99ba5e3248e",
-    "analytics_data.py": "633c6df8cd0cb2b89331f9b0e08d35c26de47fe0f8f6f7f2f8ca6b233c253347",
-    "analytics_view.py": "108a6203877f67c6fbe6bed8f16e87ceab85a7f6127798df58b4714af59a40b8"
+    "app.py": "5fdc97ac34e071523df649842fe8647c5ebad6af2d396bd512e95ca2eb43780f",
+    "core.py": "32ae7dd09b4d5a0cf630ad704ca6cfe01f2184cb3173328f0b98571bb49a0dd5",
+    "ui_theme.py": "242bcfd00ffb2bd131d7d0b4c4517f7fa74148bc5673287df6a43a02d86ec11c",
+    "charts.py": "f291ffe82cd5da5ec6acd971147f9b9d3026daa95361fafbb8ddb9bdc4a2adb5",
+    "analytics_data.py": "608c69b64932b2d86b830553e9adb45876fdc24292cfdff4ae6973885043dbae",
+    "analytics_view.py": "89f1259eb0b7b1260a18f85c7cdfabab0e188d489c4ce758f75fccd27589b028",
+    "workflows.py": "b4882d9ebc3e5ca86b9bc0ae4cc01efb2ed50b8588523393f62a0bcdb88507f9"
   },
-  "packaging": "One-file Windows x64; isolated DLL search path via build.py"
+  "packaging": "One-file Windows x64; isolated DLL search path via build.py",
+  "regressions": [
+    "duplicate confirmation and restart",
+    "legacy confirmed draft migration",
+    "selected ingredient batch",
+    "validation retains input",
+    "missing schedule diagnostics",
+    "today and manual calculation dates",
+    "daily stock conservation and explicit expiry",
+    "preview does not mutate data",
+    "frozen saved order and Excel",
+    "backup includes WAL",
+    "restore creates recovery copy",
+    "invalid backup leaves data intact"
+  ]
 }

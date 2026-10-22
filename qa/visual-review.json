@@ -1,62 +1,29 @@
 {
+  "result": "PASS",
+  "checked_at": "2026-10-22T21:40:46+07:00",
   "checked": [
-    "overview",
-    "coverage",
-    "composition",
-    "inventory",
-    "monthly comparison",
-    "hover tooltip",
-    "fullscreen"
+    "native UI stock timeline",
+    "native UI zero order preview",
+    "native UI validation retains quantity",
+    "laptop preview scrolling and pinned actions",
+    "saved order card",
+    "settings backup controls",
+    "missing schedule diagnostics"
   ],
-  "windows": [
-    {
-      "requested": [
-        1560,
-        1020
-      ],
-      "actual": [
-        1560,
-        1020
-      ],
-      "plot": [
-        1233,
-        320
-      ],
-      "scroll_height": 143,
-      "result": "PASS"
-    },
-    {
-      "requested": [
-        1366,
-        900
-      ],
-      "actual": [
-        1366,
-        900
-      ],
-      "plot": [
-        1039,
-        320
-      ],
-      "scroll_height": 263,
-      "result": "PASS"
-    },
-    {
-      "requested": [
-        1280,
-        800
-      ],
-      "actual": [
-        1280,
-        800
-      ],
-      "plot": [
-        953,
-        320
-      ],
-      "scroll_height": 363,
-      "result": "PASS"
-    }
-  ],
-  "result": "PASS"
+  "laptop_layout": {
+    "result": "PASS",
+    "main_window": [
+      1280,
+      800
+    ],
+    "preview": [
+      830,
+      660
+    ],
+    "details": [
+      1060,
+      660
+    ],
+    "missing_schedule": "Нет графика поставок для этой точки"
+  }
 }
