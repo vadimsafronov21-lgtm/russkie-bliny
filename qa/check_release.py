@@ -27,6 +27,10 @@ with tempfile.TemporaryDirectory() as temp:
     preview.qty.setValue(0); preview.findChild(QDialogButtonBox).button(QDialogButtonBox.StandardButton.Save).click(); application.processEvents()
     assert preview.height()==660
     preview.grab().save(str(folder/'preview-validation.png')); preview.close()
+    legacy_row=dict(payload['rows'][0]); legacy_row.pop('inventory_inputs',None)
+    legacy=QuantityDialog(payload,legacy_row,None,lambda *args:None,window)
+    legacy.reason.setCurrentIndex(0); legacy.show(); application.processEvents()
+    legacy.grab().save(str(folder/'legacy-reasons.png')); legacy.close()
     window.stock_check.setChecked(True); order_id=store.confirm(window.pid(),window.current,'Проверка')
     details=OrderDetailsDialog(store.get_order(order_id),'Центральная',lambda *args:None,window)
     details.resize(1060,660); details.show(); application.processEvents()

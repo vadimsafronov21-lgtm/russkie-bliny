@@ -5,7 +5,7 @@ from PySide6.QtCore import QByteArray,Qt,QRectF,QSize
 from PySide6.QtGui import QColor,QFont,QFontDatabase,QIcon,QPainter,QPixmap,QPalette
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (QTableWidget,QStyledItemDelegate,QStyleOptionViewItem,
-    QWidget,QVBoxLayout,QLabel,QAbstractItemView,QHeaderView,QStyle)
+    QWidget,QVBoxLayout,QLabel,QAbstractItemView,QHeaderView,QStyle,QProxyStyle)
 
 BURGUNDY='#A4002A'
 INK='#111E30'
@@ -40,10 +40,18 @@ def svg_icon(name,color=INK,size=20):
     pix.setDevicePixelRatio(2)
     return QIcon(pix)
 
+class QuickHelpStyle(QProxyStyle):
+    def styleHint(self,hint,option=None,widget=None,returnData=None):
+        if hint==QStyle.StyleHint.SH_ToolTip_WakeUpDelay: return 100
+        if hint==QStyle.StyleHint.SH_ToolTip_FallAsleepDelay: return 0
+        return super().styleHint(hint,option,widget,returnData)
+
 def configure_application(app):
     QFontDatabase.addApplicationFont(str(ASSETS/'fonts/Inter.ttf'))
     app.setFont(QFont('Inter',10))
-    app.setStyle('Fusion')
+    app.setStyle(QuickHelpStyle('Fusion'))
+    app.setEffectEnabled(Qt.UIEffect.UI_AnimateTooltip,False)
+    app.setEffectEnabled(Qt.UIEffect.UI_FadeTooltip,False)
     palette=app.palette()
     palette.setColor(QPalette.ColorRole.Highlight,QColor(ROSE))
     palette.setColor(QPalette.ColorRole.HighlightedText,QColor(INK))

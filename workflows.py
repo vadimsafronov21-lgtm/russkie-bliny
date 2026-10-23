@@ -1,11 +1,32 @@
 """Seller dialogs: validate in place, preview decisions, inspect saved orders."""
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QShortcut,QKeySequence
 import sqlite3
 from PySide6.QtWidgets import (QDialog,QVBoxLayout,QHBoxLayout,QFormLayout,QLabel,QComboBox,QFrame,
     QDoubleSpinBox,QSpinBox,QCheckBox,QLineEdit,QDialogButtonBox,QPushButton,QTableWidgetItem,QTabWidget,QWidget,QScrollArea)
 from core import DataError,order_impact
 from charts import StockProjectionChart,num
 from ui_theme import DataTable
+
+ORDER_REASONS=['Ожидается большой заказ','Ожидается повышенный спрос','Ожидается снижение спроса',
+    'Есть дополнительный запас','Планируется перемещение с другой точки','Изменился график поставок',
+    'Ограничено место хранения','Возврат к рекомендации']
+STOCK_REASONS=['Плановая сверка остатков','Расхождение при пересчёте','Списание по решению продавца',
+    'Повреждение упаковки','Партия исключена по пригодности','Исправление ошибки ввода']
+
+class ReasonPicker(QComboBox):
+    def __init__(self,presets=ORDER_REASONS,recent=(),parent=None):
+        super().__init__(parent); self.setEditable(True); self.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self.addItems(list(dict.fromkeys([*recent,*presets]))); self.setCurrentIndex(-1)
+        self.lineEdit().setPlaceholderText('Выберите причину или напишите свою'); self.lineEdit().setClearButtonEnabled(True)
+        self.setMaxVisibleItems(10); self.setMinimumWidth(250)
+        self.setToolTip('Готовая причина выбирается из списка. Можно ввести собственную.')
+    def text(self): return self.currentText().strip()
+    def setText(self,value): self.setEditText(value)
+    def setPlaceholderText(self,value): self.lineEdit().setPlaceholderText(value)
+
+def remember_reason(store,kind,reason):
+    store.put('reason_history:'+kind,list(dict.fromkeys([reason,*store.get('reason_history:'+kind,[])]))[:8])
 
 
 def caption(value,kind='subtitle'):
@@ -23,6 +44,9 @@ def dialog_buttons(dialog,layout,save):
             error.setText(str(e)); error.show(); return
         dialog.accept()
     buttons.accepted.connect(accept); buttons.rejected.connect(dialog.reject); layout.addWidget(buttons)
+    buttons.validation_error=error
+    shortcut=QShortcut(QKeySequence('Ctrl+Return'),dialog); shortcut.activated.connect(accept)
+    buttons.button(QDialogButtonBox.StandardButton.Save).setToolTip('Сохранить · Ctrl+Enter')
     return buttons
 
 
@@ -37,7 +61,7 @@ class StockCorrectionDialog(QDialog):
         self.info=caption(''); self.qty=QDoubleSpinBox(); self.qty.setObjectName('stockQuantity'); self.qty.setRange(0,100000); self.qty.setDecimals(3)
         self.usable=QCheckBox('Пригодность подтверждена по правилам точки')
         self.mode=QComboBox(); self.mode.addItems(['Установить фактический остаток','Зарегистрировать списание'])
-        self.reason=QLineEdit(); self.reason.setObjectName('changeReason'); self.reason.setPlaceholderText('Обязательная причина')
+        self.reason=ReasonPicker(STOCK_REASONS,store.get('reason_history:stock',[])); self.reason.setObjectName('changeReason')
         form.addRow('Партия',self.batch); form.addRow(self.info); form.addRow('Действие',self.mode)
         form.addRow('Количество',self.qty); form.addRow(self.usable); form.addRow('Причина',self.reason)
         def selected():
@@ -49,21 +73,23 @@ class StockCorrectionDialog(QDialog):
         def save():
             if not self.reason.text().strip(): self.reason.setFocus(); raise DataError('Укажите причину изменения')
             store.correct_batch(self.batch.currentData(),self.qty.value(),self.usable.isChecked(),self.reason.text(),author,self.mode.currentIndex()==1)
+            with store.db: remember_reason(store,'stock',self.reason.text())
         dialog_buttons(self,box,save)
 
 
 class QuantityDialog(QDialog):
-    def __init__(self,payload,row,old,save,parent=None):
+    def __init__(self,payload,row,old,save,parent=None,recent_reasons=()):
         super().__init__(parent); self.setWindowTitle(row['name']); self.resize(830,740)
+        self.recalculate_requested=False
         outer=QVBoxLayout(self); outer.setContentsMargins(25,22,25,22); outer.setSpacing(12)
         scroll=QScrollArea(); scroll.setWidgetResizable(True); scroll.setFrameShape(QFrame.Shape.NoFrame)
-        body=QWidget(); box=QVBoxLayout(body); box.setContentsMargins(0,0,8,0); box.setSpacing(12)
+        body=QWidget(); box=QVBoxLayout(body); box.setContentsMargins(0,0,8,0); box.setSpacing(12); box.setAlignment(Qt.AlignmentFlag.AlignTop)
         scroll.setWidget(body); outer.addWidget(scroll,1)
         box.addWidget(caption(row['name'],'title'))
         box.addWidget(caption(f'Рекомендация: {row["packs"]} уп. по {num(row["pack"],2)} {row["unit"]}'))
         form=QFormLayout(); self.qty=QSpinBox(); self.qty.setObjectName('orderQuantity'); self.qty.setRange(0,100000)
-        self.qty.setValue(old['packs'] if old else row['packs']); self.reason=QLineEdit(); self.reason.setObjectName('changeReason')
-        self.reason.setText(old.get('reason','') if old else ''); self.reason.setPlaceholderText('Например: ожидается большой заказ')
+        self.qty.setValue(old['packs'] if old else row['packs']); self.reason=ReasonPicker(ORDER_REASONS,recent_reasons); self.reason.setObjectName('changeReason')
+        self.reason.setText(old.get('reason','') if old else '')
         form.addRow('Итого упаковок',self.qty); form.addRow('Причина',self.reason); box.addLayout(form)
         actions=QHBoxLayout()
         for title,qty in [('Обнулить',0),('Вернуть рекомендацию',row['packs'])]:
@@ -72,7 +98,7 @@ class QuantityDialog(QDialog):
         self.summary=caption('','section'); box.addWidget(self.summary)
         self.chart=StockProjectionChart(); self.chart.setMinimumHeight(260); box.addWidget(self.chart,1)
         self.risks=caption('','notice'); box.addWidget(self.risks)
-        box.addWidget(caption('Линии показывают расчёт. Новый заказ доступен с начала дня поставки; фактическое поступление нужно подтвердить отдельно.'))
+        graph_note=caption('Линии показывают расчёт. Новый заказ доступен с начала дня поставки; фактическое поступление нужно подтвердить отдельно.'); box.addWidget(graph_note)
         def preview():
             cost=self.qty.value()*row['pack']*row['cost']; delta=cost-row['packs']*row['pack']*row['cost']
             signed=f'{delta:+,.0f}'.replace(',',' ')
@@ -81,12 +107,23 @@ class QuantityDialog(QDialog):
                 base=order_impact(payload,row,0); picked=order_impact(payload,row,self.qty.value())
                 self.chart.set_data(base,picked,row['unit'],payload['arrival'])
                 self.risks.setText(f'Остаток в конце: {num(picked["closing"],2)} {row["unit"]} · цель {num(row["target"],2)} {row["unit"]}\nНепокрытая потребность за период: {num(picked["shortage"],2)} {row["unit"]}, до поставки: {num(picked["shortage_before"],2)} {row["unit"]}')
-            except DataError as e: self.chart.hide(); self.risks.setText(str(e))
+            except DataError:
+                self.chart.hide(); graph_note.hide(); self.risks.setText('В этом сохранённом расчёте нет данных для графика. Пересчитайте заявку — сохранённые ручные количества и причины останутся.'); self.resize(830,520)
         self.qty.valueChanged.connect(preview); preview()
         def persist():
             if not self.reason.text().strip(): self.reason.setFocus(); raise DataError('Укажите причину ручного изменения')
             save(self.qty.value(),self.reason.text().strip())
-        dialog_buttons(self,outer,persist)
+        buttons=dialog_buttons(self,outer,persist)
+        if 'inventory_inputs' not in row or 'daily_demand' not in row:
+            recalc=buttons.addButton('Пересчитать заявку',QDialogButtonBox.ButtonRole.ActionRole)
+            def recalculate():
+                if self.qty.value()!=(old['packs'] if old else row['packs']) or self.reason.text()!=(old.get('reason','') if old else ''):
+                    try: persist()
+                    except (DataError,ValueError,OSError,sqlite3.Error) as e:
+                        buttons.validation_error.setText(str(e)); buttons.validation_error.show(); return
+                self.recalculate_requested=True; self.accept()
+            recalc.clicked.connect(recalculate)
+        self.qty.setFocus(); self.qty.selectAll()
 
 
 def readable_change(value):

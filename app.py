@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QVBoxLayout,QHBo
 from analytics_view import AnalyticsPanel
 from core import Store,DataError,calculate,calculation_day,order_impact,now,export_order,write_templates,LABELS,SCHEMAS
 from charts import StockProjectionChart
-from workflows import StockCorrectionDialog,QuantityDialog,OrderDetailsDialog,dialog_buttons,order_total,readable_change
+from workflows import StockCorrectionDialog,QuantityDialog,OrderDetailsDialog,dialog_buttons,order_total,readable_change,ReasonPicker,remember_reason
 
 from ui_theme import STYLE,ASSETS,BURGUNDY,INK,DataTable,svg_icon,configure_application
 
@@ -388,8 +388,11 @@ class MainWindow(QMainWindow):
             with self.store.db:
                 self.store.log('Правка заявки',{'id':r['id'],'name':r['name'],'old':old,'recommended':r['packs']},edit,reason,self.author())
                 self.store.put('draft:'+self.pid(),self.current)
-        dialog=QuantityDialog(self.current,r,old,save,self)
-        if dialog.exec()==QDialog.DialogCode.Accepted: self.refresh_order()
+                remember_reason(self.store,'order',reason)
+        dialog=QuantityDialog(self.current,r,old,save,self,recent_reasons=self.store.get('reason_history:order',[]))
+        if dialog.exec()==QDialog.DialogCode.Accepted:
+            if dialog.recalculate_requested: self._make_order()
+            else: self.refresh_order()
     def confirm_order(self): self.safe(self._confirm_order)
     def _confirm_order(self):
         self.check_day()

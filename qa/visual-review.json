@@ -1,10 +1,13 @@
 {
   "result": "PASS",
-  "checked_at": "2026-10-22T21:40:46+07:00",
+  "checked_at": "2026-10-23T22:12:27+07:00",
   "checked": [
-    "native UI stock timeline",
-    "native UI zero order preview",
-    "native UI validation retains quantity",
+    "Qt stock timeline",
+    "Qt zero order preview",
+    "Qt validation retains quantity",
+    "preset and custom reasons",
+    "compact legacy calculation",
+    "100ms tooltip policy without animation",
     "laptop preview scrolling and pinned actions",
     "saved order card",
     "settings backup controls",

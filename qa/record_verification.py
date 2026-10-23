@@ -32,7 +32,8 @@ data={'generated':now(),'environment':'Windows 11, Python 3.13, Qt 6.12',
 (ROOT/'qa/verification.json').write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf-8')
 layout=json.loads((ROOT/'qa/release-layout/result.json').read_text(encoding='utf-8'))
 (ROOT/'qa/visual-review.json').write_text(json.dumps({'result':'PASS','checked_at':now(),
-    'checked':['native UI stock timeline','native UI zero order preview','native UI validation retains quantity',
+    'checked':['Qt stock timeline','Qt zero order preview','Qt validation retains quantity',
+               'preset and custom reasons','compact legacy calculation','100ms tooltip policy without animation',
                'laptop preview scrolling and pinned actions','saved order card','settings backup controls','missing schedule diagnostics'],
     'laptop_layout':layout},ensure_ascii=False,indent=2),encoding='utf-8')
 print(json.dumps({'tests':data['tests'],'packaged':packaged['status'],'sha256':data['binary_sha256']}))

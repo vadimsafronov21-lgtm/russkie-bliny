@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-22T21:40:46+07:00",
+  "generated": "2026-10-23T22:12:27+07:00",
   "environment": "Windows 11, Python 3.13, Qt 6.12",
   "end_to_end": [
     "Qt screens",
@@ -14,13 +14,13 @@
     "saved order details",
     "SQLite backup"
   ],
-  "calculation_seconds": 0.378,
+  "calculation_seconds": 0.388,
   "training_window": "last 12 calendar months, strictly before calculation day",
-  "last_closed_shift": "2026-10-21",
+  "last_closed_shift": "2026-10-22",
   "coverage_days": 4,
   "data": "synthetic demonstration; no measured economic effect",
   "tests": {
-    "passed": 68,
+    "passed": 72,
     "failed": 0,
     "skipped": 0
   },
@@ -40,17 +40,17 @@
       "SQLite backup"
     ],
     "order_id": 1,
-    "time": "2026-10-22T21:39:19+07:00"
+    "time": "2026-10-23T22:10:37+07:00"
   },
-  "binary_sha256": "82332e36b7ec56ca321b79752354ee8effea36e8bd44d67d36a756ee1e874a8c",
+  "binary_sha256": "44d7ef9e05b89f3226a9677b2f0343f64f5a45f7d0eb6ad0cb20d9903c33c361",
   "source_sha256": {
-    "app.py": "5fdc97ac34e071523df649842fe8647c5ebad6af2d396bd512e95ca2eb43780f",
+    "app.py": "def64b25fbb22ddb2a4dc6619b4387210f89e27749b0dc9a6dcad57cad2322b1",
     "core.py": "32ae7dd09b4d5a0cf630ad704ca6cfe01f2184cb3173328f0b98571bb49a0dd5",
-    "ui_theme.py": "242bcfd00ffb2bd131d7d0b4c4517f7fa74148bc5673287df6a43a02d86ec11c",
+    "ui_theme.py": "66cc76743ab7e62550d4c2416545f771a45eda9ff21965746cb9807ba3a9ceb3",
     "charts.py": "f291ffe82cd5da5ec6acd971147f9b9d3026daa95361fafbb8ddb9bdc4a2adb5",
     "analytics_data.py": "608c69b64932b2d86b830553e9adb45876fdc24292cfdff4ae6973885043dbae",
     "analytics_view.py": "89f1259eb0b7b1260a18f85c7cdfabab0e188d489c4ce758f75fccd27589b028",
-    "workflows.py": "b4882d9ebc3e5ca86b9bc0ae4cc01efb2ed50b8588523393f62a0bcdb88507f9"
+    "workflows.py": "fd132ef495ff95a91b39392c8a774019faea42cf15e2fb19fdb710128da4976d"
   },
   "packaging": "One-file Windows x64; isolated DLL search path via build.py",
   "regressions": [

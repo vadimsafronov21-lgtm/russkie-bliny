@@ -155,3 +155,47 @@ def test_history_details_and_filters_preserve_frozen_order(tmp_path,application)
     export=next(b for b in dialog.findChildren(QPushButton) if b.text()=='Экспортировать Excel')
     export.click(); assert exported==[second]
     dialog.close(); window.close(); store.db.close()
+
+
+def test_ready_reasons_are_optional_and_custom_text_stays_editable(application):
+    from workflows import ReasonPicker,ORDER_REASONS
+    picker=ReasonPicker(recent=['Моя причина'])
+    assert picker.text()==''
+    picker.setCurrentIndex(picker.findText(ORDER_REASONS[0])); assert picker.text()==ORDER_REASONS[0]
+    picker.setText('Другая причина'); assert picker.text()=='Другая причина'
+    assert picker.itemText(0)=='Моя причина'
+    picker.close()
+
+
+def test_saved_reason_history_survives_restart_and_is_bounded(tmp_path,application):
+    from workflows import remember_reason
+    path=tmp_path/'reasons.sqlite3'; store=Store(path); store.seed()
+    with store.db:
+        for i in range(12): remember_reason(store,'order',f'Причина {i}')
+        remember_reason(store,'order','Причина 8')
+    store.db.close(); store=Store(path)
+    assert store.get('reason_history:order')[0]=='Причина 8'
+    assert len(store.get('reason_history:order'))==8
+    assert store.get('reason_history:stock',[])==[]
+    store.db.close()
+
+
+def test_old_calculation_recalculate_preserves_unsaved_edit(tmp_path,application):
+    from PySide6.QtWidgets import QPushButton
+    store=Store(tmp_path/'legacy-preview.sqlite3'); store.seed(); window=MainWindow(store); window._make_order()
+    payload=window.current; row=dict(payload['rows'][0]); row.pop('inventory_inputs'); saved=[]
+    dialog=QuantityDialog(payload,row,None,lambda n,r:saved.append((n,r)))
+    dialog.show(); application.processEvents(); assert dialog.height()<=540
+    dialog.qty.setValue(2)
+    recalc=next(b for b in dialog.findChildren(QPushButton) if b.text()=='Пересчитать заявку')
+    recalc.click(); assert dialog.isVisible() and not dialog.recalculate_requested
+    dialog.reason.setCurrentIndex(0); recalc.click()
+    assert dialog.recalculate_requested and saved==[(2,dialog.reason.text())]
+    window.close(); dialog.close(); store.db.close()
+
+
+def test_fast_tooltip_policy(application):
+    from PySide6.QtWidgets import QStyle
+    assert application.style().styleHint(QStyle.StyleHint.SH_ToolTip_WakeUpDelay)==100
+    assert not application.isEffectEnabled(Qt.UIEffect.UI_FadeTooltip)
+    assert not application.isEffectEnabled(Qt.UIEffect.UI_AnimateTooltip)
