@@ -66,6 +66,8 @@ class FileAdapter(AccountingAdapter):
                                      for row in rows if any(x is not None for x in row)]
             finally: wb.close()
             if not result: raise DataError('В XLSX нет известных листов. Используйте шаблон.')
+            if not any(result.values()):
+                raise DataError('Пустой шаблон: заполните таблицы перед импортом. Для проверки используйте «Демо-пример». Данные не изменены.')
             return result
         if path.suffix.lower()!='.csv': raise DataError('Поддерживаются XLSX и CSV.')
         kind=kind or path.stem
@@ -106,6 +108,8 @@ def flag(v, label):
     return str(v).lower() in ('1','true')
 
 def validate(tables, existing=None):
+    if 'points' in tables and not tables['points']:
+        raise DataError('Пустой справочник точек: заполните points перед импортом. Данные не изменены.')
     existing=existing or {}
     merged={k:tables.get(k,existing.get(k,[])) for k in SCHEMAS}
     errors=[]
@@ -585,6 +589,9 @@ def export_order(path,payload,order_id):
 def write_templates(directory,tables=None):
     from openpyxl import Workbook
     directory=Path(directory); directory.mkdir(parents=True,exist_ok=True)
+    names=[kind+'.csv' for kind in SCHEMAS]+['demo.xlsx' if tables else 'import_template.xlsx']
+    if any((directory/name).exists() for name in names):
+        raise DataError('В папке уже существуют файлы шаблонов или данных. Выберите новую папку, чтобы не перезаписать их.')
     wb=Workbook(); wb.remove(wb.active)
     for kind,fields in SCHEMAS.items():
         ws=wb.create_sheet(kind); ws.append(fields)

@@ -28,3 +28,7 @@ qa/operator-features-tests.xml
 qa/release-2026-10-28-tests.xml
 qa/release-2026-10-28-source-smoke/
 qa/release-2026-10-28-exe-smoke/
+qa/import-fix-build/
+qa/import-fix-source-smoke/
+qa/import-fix-exe-smoke/
+qa/import-fix-tests.xml

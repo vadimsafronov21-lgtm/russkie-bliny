@@ -6,7 +6,7 @@ import sys
 
 from PySide6.QtWidgets import QDialog
 
-from core import DataError,now
+from core import DataError,FileAdapter,now,write_templates
 from dalion_demo import DalionDemoDialog
 from exchange_review import prepare_import
 from interaction_ui import CommandPalette,CompareOrdersDialog
@@ -18,6 +18,33 @@ def run_feature_checks(window,folder,application):
     if not window.store.get('demo'):
         raise DataError('Проверка сборки требует отдельной базы с синтетическими данными.')
     folder=Path(folder); store=window.store; steps=[]
+    blank=folder/'blank-template'; write_templates(blank)
+    try:
+        FileAdapter().read(blank/'import_template.xlsx')
+    except DataError: pass
+    else: raise AssertionError('An empty template must be rejected')
+    original=(blank/'points.csv').read_bytes()
+    try: write_templates(blank,store.get('tables'))
+    except DataError: pass
+    else: raise AssertionError('Existing templates must not be overwritten')
+    assert (blank/'points.csv').read_bytes()==original
+    from PySide6.QtWidgets import QFileDialog
+    source=folder/'button-import'; incoming=store.get('tables'); incoming['batches'][0]['qty']+=1
+    write_templates(source,incoming)
+    original_picker=QFileDialog.getOpenFileName; original_review=ReviewImportDialog.exec
+    def accept_review(dialog):
+        for choice in dialog.choices: choice.setCurrentIndex(2)
+        dialog.reason.setText('Проверка импорта в сборке')
+        dialog.apply(); assert dialog.result is not None
+        return QDialog.DialogCode.Accepted
+    try:
+        QFileDialog.getOpenFileName=lambda *args:(str(source/'demo.xlsx'),'')
+        ReviewImportDialog.exec=accept_review
+        window.import_data()
+        assert store.get('tables')['batches'][0]['qty']==incoming['batches'][0]['qty']
+    finally:
+        QFileDialog.getOpenFileName=original_picker; ReviewImportDialog.exec=original_review
+    steps.append('file import button and empty-template protection')
     window.select_route('stock','today'); application.processEvents()
     assert window.daily_table.rowCount()>0
     window.grab().save(str(folder/'features-today.png')); steps.append('daily actions')

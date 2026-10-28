@@ -1,8 +1,8 @@
 ﻿id;point;ingredient;qty;unit;usable;checked_at;use_before;_dataset
-b0;central;dough;14;л;1;2026-10-20T23:22:25+07:00;;DEMO
-b1;central;cream;0.8;кг;1;2026-10-20T23:22:25+07:00;;DEMO
-b2;central;chicken_i;1.1;кг;1;2026-10-20T23:22:25+07:00;;DEMO
-b3;central;cheese;1.4;кг;1;2026-10-20T23:22:25+07:00;;DEMO
-b4;central;ham_i;2.8;кг;1;2026-10-20T23:22:25+07:00;;DEMO
-b5;central;cherry;5.5;кг;1;2026-10-20T23:22:25+07:00;;DEMO
-b6;central;caviar_i;0.75;кг;1;2026-10-20T23:22:25+07:00;;DEMO
+b0;central;dough;14;л;1;2026-10-28T20:00:19+07:00;;DEMO
+b1;central;cream;0.8;кг;1;2026-10-28T20:00:19+07:00;;DEMO
+b2;central;chicken_i;1.1;кг;1;2026-10-28T20:00:19+07:00;;DEMO
+b3;central;cheese;1.4;кг;1;2026-10-28T20:00:19+07:00;;DEMO
+b4;central;ham_i;2.8;кг;1;2026-10-28T20:00:19+07:00;;DEMO
+b5;central;cherry;5.5;кг;1;2026-10-28T20:00:19+07:00;;DEMO
+b6;central;caviar_i;0.75;кг;1;2026-10-28T20:00:19+07:00;;DEMO

@@ -1,12 +1,12 @@
 {
-  "release": "2026-10-28-all-features",
-  "created": "2026-10-28T19:44:57+07:00",
-  "base_commit": "13b16c3372be4724e0c427c67fe61aaf7d16ed50",
+  "release": "2026-10-28-import-fix",
+  "created": "2026-10-28T20:05:42+07:00",
+  "base_commit": "54e5ef5a44697a0eea1657c4dd3e142080c15ffc",
   "binary": {
     "path": "dist/RusskieBliny.exe",
     "desktop_filename": "Русские блины.exe",
-    "sha256": "7af4f47ea68952b75cfdd3f3a59f879920c3c762b92de54fd4c5bd615699a22b",
-    "bytes": 49675387,
+    "sha256": "e307b559d7aa022ae7c76b1766700da369278eaaffc8754b606d4773adf16c84",
+    "bytes": 49677927,
     "platform": "Windows x64",
     "subsystem": "Windows GUI",
     "packaging": "PyInstaller --onefile --windowed; includes Python, Qt and assets"
@@ -16,16 +16,16 @@
     "pyinstaller": "6.22.3",
     "pyside6": "6.12.0",
     "openpyxl": "3.1.5",
-    "command": ".venv/Scripts/python.exe build.py"
+    "command": ".venv/Scripts/python.exe build.py --distpath qa/import-fix-build; verified binary copied to dist"
   },
   "tests": {
     "status": "PASS",
-    "tests": 157,
+    "tests": 164,
     "errors": 0,
     "failures": 0,
     "skipped": 0,
-    "seconds": 462.088,
-    "report": "qa/release-2026-10-28/tests.xml"
+    "seconds": 330.944,
+    "report": "qa/import-fix-evidence/tests.xml"
   },
   "smoke": {
     "source": {
@@ -44,7 +44,7 @@
         "SQLite backup"
       ],
       "order_id": 1,
-      "time": "2026-10-28T19:37:33+07:00"
+      "time": "2026-10-28T20:01:14+07:00"
     },
     "exe": {
       "status": "PASS",
@@ -62,15 +62,16 @@
         "SQLite backup"
       ],
       "order_id": 1,
-      "time": "2026-10-28T19:42:24+07:00"
+      "time": "2026-10-28T20:03:39+07:00"
     }
   },
   "features": {
     "source": {
       "status": "PASS",
       "frozen": false,
-      "time": "2026-10-28T19:37:33+07:00",
+      "time": "2026-10-28T20:01:14+07:00",
       "steps": [
+        "file import button and empty-template protection",
         "daily actions",
         "isolated what-if calculation",
         "auditable draft undo and confirmed lock",
@@ -90,8 +91,9 @@
     "exe": {
       "status": "PASS",
       "frozen": true,
-      "time": "2026-10-28T19:42:24+07:00",
+      "time": "2026-10-28T20:03:39+07:00",
       "steps": [
+        "file import button and empty-template protection",
         "daily actions",
         "isolated what-if calculation",
         "auditable draft undo and confirmed lock",
@@ -119,7 +121,7 @@
   "source_sha256": {
     "analytics_data.py": "608c69b64932b2d86b830553e9adb45876fdc24292cfdff4ae6973885043dbae",
     "analytics_view.py": "89f1259eb0b7b1260a18f85c7cdfabab0e188d489c4ce758f75fccd27589b028",
-    "app.py": "ab0900031c11d6f0f6df8a030bc64cfee3264ca2266bebfca3ea7d2e778ea9df",
+    "app.py": "c20bfed99d96c6e6784044f5df1e73546073e7642d829aa7cc0eba8ee2b93451",
     "assets/fonts/Inter.ttf": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031",
     "assets/fonts/OFL.txt": "5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57",
     "assets/icons/check.svg": "b40583b13a819d2d55aedf2fa20152f612a04f0304a652424325b8c663fb41f6",
@@ -128,7 +130,7 @@
     "assets/krona-wordmark.png": "0979f9aae1441a5b3181d293b661163775c2c349ab81c4534bed78e098b2440f",
     "build.py": "18181d315dafa34dce874b5df8c204b71a58bac34edac18f2c4dff851b52f173",
     "charts.py": "ca0e57eaed9a1e884cab712d64ea15b0c89a6eee0b82e3028acb562f653d0ff4",
-    "core.py": "c1b2ef6740d31c751ab8d023f52e30518a02f74bb83cb19f7090577e13b9f15e",
+    "core.py": "4c533e116ca3fcacb7d52fa7b955c8d465479b0aeb4d7333233060b15d8e6ff7",
     "customer_demo.py": "b5fcfa749a3ce0c04e139292c0c9cadf0dc1b06f3e215b533429d9ef18b22aed",
     "dalion_demo.py": "966d1fbbd65d39877e706cb48f5eb60fcfe4ffdf75bf881028313a7053aff694",
     "dalion_exchange.py": "25b18f94be7a1df8242f4c758ac6ffbc4175d9a472e563a20afe354f41558a4f",
@@ -140,7 +142,7 @@
     "operations.py": "8177f9578974a993c7d6f3614408162236d2c0bfc43d7879c9ada023aaa9eeeb",
     "operations_ui.py": "bc874f64f94f961fa9223a342b7762b3110002e13c8ac7075a524a47e34e785c",
     "package_release.py": "aba8e0b2cc6e7978c5b4b799818383c8d3afb0f3d398279ea720320f64e611de",
-    "release_checks.py": "f83f38518d25143bd9f368dd8221b5dcf151cba8d771997695ac128a39d6a8d9",
+    "release_checks.py": "3fd2405f5b975db158345f084477993685f1cf64ceb3aff5b947fe00fb4fd968",
     "requirements-build.txt": "41f5ca92a673d8177b0d11a1875d68aaa86a9677eaf7e01a6bce0acacfc185eb",
     "requirements.txt": "e9d8eeb2fb3db989705fcd3bfd83fac0e231f87fe819cb0189205795449a227e",
     "ui_theme.py": "68a4f9cc67315553408f1823e82650d2b9bb2c05c821fae2dc27179fa4d4ec47",
@@ -150,7 +152,7 @@
   "source_git_blob_sha256": {
     "analytics_data.py": "608c69b64932b2d86b830553e9adb45876fdc24292cfdff4ae6973885043dbae",
     "analytics_view.py": "89f1259eb0b7b1260a18f85c7cdfabab0e188d489c4ce758f75fccd27589b028",
-    "app.py": "34693c1174f98e033b002f17bed8861e662b3aef31d9a3367187cd31d52892b1",
+    "app.py": "3749c57f141fb128ea30a75f80248371d1dda84c0766ae9152d839d26a75d2fe",
     "assets/fonts/Inter.ttf": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031",
     "assets/fonts/OFL.txt": "5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57",
     "assets/icons/check.svg": "b40583b13a819d2d55aedf2fa20152f612a04f0304a652424325b8c663fb41f6",
@@ -159,7 +161,7 @@
     "assets/krona-wordmark.png": "0979f9aae1441a5b3181d293b661163775c2c349ab81c4534bed78e098b2440f",
     "build.py": "18181d315dafa34dce874b5df8c204b71a58bac34edac18f2c4dff851b52f173",
     "charts.py": "ca0e57eaed9a1e884cab712d64ea15b0c89a6eee0b82e3028acb562f653d0ff4",
-    "core.py": "c1b2ef6740d31c751ab8d023f52e30518a02f74bb83cb19f7090577e13b9f15e",
+    "core.py": "4c533e116ca3fcacb7d52fa7b955c8d465479b0aeb4d7333233060b15d8e6ff7",
     "customer_demo.py": "b5fcfa749a3ce0c04e139292c0c9cadf0dc1b06f3e215b533429d9ef18b22aed",
     "dalion_demo.py": "966d1fbbd65d39877e706cb48f5eb60fcfe4ffdf75bf881028313a7053aff694",
     "dalion_exchange.py": "25b18f94be7a1df8242f4c758ac6ffbc4175d9a472e563a20afe354f41558a4f",
@@ -171,11 +173,28 @@
     "operations.py": "8177f9578974a993c7d6f3614408162236d2c0bfc43d7879c9ada023aaa9eeeb",
     "operations_ui.py": "bc874f64f94f961fa9223a342b7762b3110002e13c8ac7075a524a47e34e785c",
     "package_release.py": "aba8e0b2cc6e7978c5b4b799818383c8d3afb0f3d398279ea720320f64e611de",
-    "release_checks.py": "f83f38518d25143bd9f368dd8221b5dcf151cba8d771997695ac128a39d6a8d9",
+    "release_checks.py": "3fd2405f5b975db158345f084477993685f1cf64ceb3aff5b947fe00fb4fd968",
     "requirements-build.txt": "41f5ca92a673d8177b0d11a1875d68aaa86a9677eaf7e01a6bce0acacfc185eb",
     "requirements.txt": "e9d8eeb2fb3db989705fcd3bfd83fac0e231f87fe819cb0189205795449a227e",
     "ui_theme.py": "68a4f9cc67315553408f1823e82650d2b9bb2c05c821fae2dc27179fa4d4ec47",
     "verify.py": "816891923e3231af59cce5a026cccd2b23047d9e94798ce59f6fe69627197ddb",
     "workflows.py": "4de74827497daab5b44673b8b374c8aa7d4ff09ae1c9ccdda2e764f38f526241"
-  }
+  },
+  "example_sha256": {
+    "examples/batches.csv": "6ae1598cbcc70c22066aee2c292da84fa15b44854cdf0c270be9181c58f45e87",
+    "examples/deliveries.csv": "a93f11b57ca497b2f34ded7ef2787cadf17c1cff50f0f3f667dde54a663a7b05",
+    "examples/items.csv": "6dc0b5f1b4d8f1259b27a330e2f30bbce5cbf476fa41ee3d8ed91431b75ab473",
+    "examples/movements.csv": "531a385d79b62edf2b0236fb5bfc59a98186dc469e9e4235d24e41a3109e97b3",
+    "examples/points.csv": "02b3c2c5e4c8f2d20375bc04cd4dec14a5d20479d2ef0a61bcc2f6164007cb99",
+    "examples/recipes.csv": "5fa287b5aeffcb8ab8b7c72499b62fe05e916163b6293dccd9d9edba837d1405",
+    "examples/sales.csv": "2f809d919179e85be2a289fbe9a427346a6d73224dc0ef16951a09cfa01294b2",
+    "examples/schedules.csv": "3691ab266ca8df71be17c05b9fe264386984f7786e5f17c68c47a316b7301fe4",
+    "examples/demo.xlsx": "0b8ac4661378510640d1969088b8d3a3b8eeb79d19d55dda9a41bcfd0f9fbe1a"
+  },
+  "fixes": [
+    "Reject empty XLSX and empty points without database writes",
+    "Keep existing CSV/XLSX files when exporting templates",
+    "Restore populated synthetic examples",
+    "Exercise the import button in packaged smoke checks"
+  ]
 }

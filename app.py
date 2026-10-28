@@ -434,8 +434,12 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
         if folder:
             from core import demo_data
             def save():
-                write_templates(folder,demo_data() if demo else None)
-                self.notify_export('Шаблоны сохранены.',Path(folder)/('demo.xlsx' if demo else 'import_template.xlsx'))
+                target=Path(folder)
+                names=[kind+'.csv' for kind in SCHEMAS]+['demo.xlsx' if demo else 'import_template.xlsx']
+                if any((target/name).exists() for name in names):
+                    target=target/(('demo-' if demo else 'templates-')+uuid.uuid4().hex[:8])
+                write_templates(target,demo_data() if demo else None)
+                self.notify_export('Демо-пример сохранён.' if demo else 'Пустые шаблоны сохранены. Заполните их перед импортом.',target/('demo.xlsx' if demo else 'import_template.xlsx'))
             self.safe(save)
     def import_data(self):
         path,_=QFileDialog.getOpenFileName(self,'Импорт снимка данных','','Таблицы (*.xlsx *.csv)')
