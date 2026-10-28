@@ -69,8 +69,11 @@ class StockProjectionChart(QWidget):
         for i in sorted(set([0]+[round(j*count/5) for j in range(1,6)])):
             value='Начало' if i==0 else date.fromisoformat(self.picked['points'][i-1]['date']).strftime('%d.%m')
             p.drawText(QRectF(xpos(i)-25,rect.bottom()+9,50,18),Qt.AlignmentFlag.AlignCenter,value)
-        for x,title,color,dashed in [(rect.left(),'Без нового заказа','#697080',True),(rect.left()+220,'С выбранным заказом',BURGUNDY,False)]:
-            y=self.height()-23; pen=QPen(QColor(color),2); pen.setStyle(Qt.PenStyle.DashLine if dashed else Qt.PenStyle.SolidLine); p.setPen(pen); p.drawLine(QPointF(x,y),QPointF(x+22,y)); p.setPen(QColor('#555968')); p.drawText(QPointF(x+30,y+4),title)
+        compact=self.width()<520
+        for index,(title,color,dashed) in enumerate([('Без нового заказа','#697080',True),('С выбранным заказом',BURGUNDY,False)]):
+            x=rect.left()+(220 if index and not compact else 0)
+            y=self.height()-23-(20 if compact and not index else 0)
+            pen=QPen(QColor(color),2); pen.setStyle(Qt.PenStyle.DashLine if dashed else Qt.PenStyle.SolidLine); p.setPen(pen); p.drawLine(QPointF(x,y),QPointF(x+22,y)); p.setPen(QColor('#555968')); p.drawText(QPointF(x+30,y+4),title)
     def mouseMoveEvent(self,event):
         rect=self.plot_rect()
         if not self.picked or not rect.contains(event.position()): QToolTip.hideText(); return

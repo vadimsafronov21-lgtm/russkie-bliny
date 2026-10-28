@@ -17,3 +17,14 @@ qa/test-results.xml
 qa/*-error.log
 qa/fixes-smoke/
 qa/fixes-packaged-smoke/
+# Local demonstration evidence; curated release evidence is kept separately.
+qa/dalion-demo-smoke/
+qa/interaction-entry-smoke/
+qa/interaction-smoke/
+qa/operator-features-smoke/
+qa/dalion-demo-tests.xml
+qa/interaction-tests.xml
+qa/operator-features-tests.xml
+qa/release-2026-10-28-tests.xml
+qa/release-2026-10-28-source-smoke/
+qa/release-2026-10-28-exe-smoke/

@@ -1,0 +1,181 @@
+{
+  "release": "2026-10-28-all-features",
+  "created": "2026-10-28T19:44:57+07:00",
+  "base_commit": "13b16c3372be4724e0c427c67fe61aaf7d16ed50",
+  "binary": {
+    "path": "dist/RusskieBliny.exe",
+    "desktop_filename": "Русские блины.exe",
+    "sha256": "7af4f47ea68952b75cfdd3f3a59f879920c3c762b92de54fd4c5bd615699a22b",
+    "bytes": 49675387,
+    "platform": "Windows x64",
+    "subsystem": "Windows GUI",
+    "packaging": "PyInstaller --onefile --windowed; includes Python, Qt and assets"
+  },
+  "build": {
+    "python": "3.13.16",
+    "pyinstaller": "6.22.3",
+    "pyside6": "6.12.0",
+    "openpyxl": "3.1.5",
+    "command": ".venv/Scripts/python.exe build.py"
+  },
+  "tests": {
+    "status": "PASS",
+    "tests": 157,
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0,
+    "seconds": 462.088,
+    "report": "qa/release-2026-10-28/tests.xml"
+  },
+  "smoke": {
+    "source": {
+      "status": "PASS",
+      "steps": [
+        "Qt screens",
+        "XLSX import",
+        "stock correction",
+        "forecast",
+        "manual edit",
+        "idempotent confirmation",
+        "Excel export",
+        "daily stock projection",
+        "quantity preview",
+        "saved order details",
+        "SQLite backup"
+      ],
+      "order_id": 1,
+      "time": "2026-10-28T19:37:33+07:00"
+    },
+    "exe": {
+      "status": "PASS",
+      "steps": [
+        "Qt screens",
+        "XLSX import",
+        "stock correction",
+        "forecast",
+        "manual edit",
+        "idempotent confirmation",
+        "Excel export",
+        "daily stock projection",
+        "quantity preview",
+        "saved order details",
+        "SQLite backup"
+      ],
+      "order_id": 1,
+      "time": "2026-10-28T19:42:24+07:00"
+    }
+  },
+  "features": {
+    "source": {
+      "status": "PASS",
+      "frozen": false,
+      "time": "2026-10-28T19:37:33+07:00",
+      "steps": [
+        "daily actions",
+        "isolated what-if calculation",
+        "auditable draft undo and confirmed lock",
+        "frozen order comparison",
+        "ingredient side card",
+        "command palette",
+        "persistent large mode",
+        "workspace persistence",
+        "nonmodal export actions",
+        "availability journal",
+        "prospective pilot and Excel",
+        "atomic exchange conflict resolution",
+        "local DALION HTTP adapter",
+        "four independent demonstration scenarios"
+      ]
+    },
+    "exe": {
+      "status": "PASS",
+      "frozen": true,
+      "time": "2026-10-28T19:42:24+07:00",
+      "steps": [
+        "daily actions",
+        "isolated what-if calculation",
+        "auditable draft undo and confirmed lock",
+        "frozen order comparison",
+        "ingredient side card",
+        "command palette",
+        "persistent large mode",
+        "workspace persistence",
+        "nonmodal export actions",
+        "availability journal",
+        "prospective pilot and Excel",
+        "atomic exchange conflict resolution",
+        "local DALION HTTP adapter",
+        "four independent demonstration scenarios"
+      ]
+    }
+  },
+  "launch_check": {
+    "working_directory": "Windows TEMP",
+    "path": "Windows System32 and Windows only",
+    "user_database_used": false,
+    "fresh_synthetic_data": true
+  },
+  "source_hash_note": "source_sha256 hashes actual build input bytes; source_git_blob_sha256 hashes Git index bytes after configured line-ending normalization.",
+  "source_sha256": {
+    "analytics_data.py": "608c69b64932b2d86b830553e9adb45876fdc24292cfdff4ae6973885043dbae",
+    "analytics_view.py": "89f1259eb0b7b1260a18f85c7cdfabab0e188d489c4ce758f75fccd27589b028",
+    "app.py": "ab0900031c11d6f0f6df8a030bc64cfee3264ca2266bebfca3ea7d2e778ea9df",
+    "assets/fonts/Inter.ttf": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031",
+    "assets/fonts/OFL.txt": "5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57",
+    "assets/icons/check.svg": "b40583b13a819d2d55aedf2fa20152f612a04f0304a652424325b8c663fb41f6",
+    "assets/icons/chevron-down.svg": "1bafc2c35ebf0b7cc01d54786788a3932776c85af1608fd8685f544d6009e3ae",
+    "assets/icons/chevron-up.svg": "569e5f9927155a70d623d34a1b63f77c8337fbbe5ea61200f383310faea77575",
+    "assets/krona-wordmark.png": "0979f9aae1441a5b3181d293b661163775c2c349ab81c4534bed78e098b2440f",
+    "build.py": "18181d315dafa34dce874b5df8c204b71a58bac34edac18f2c4dff851b52f173",
+    "charts.py": "ca0e57eaed9a1e884cab712d64ea15b0c89a6eee0b82e3028acb562f653d0ff4",
+    "core.py": "c1b2ef6740d31c751ab8d023f52e30518a02f74bb83cb19f7090577e13b9f15e",
+    "customer_demo.py": "b5fcfa749a3ce0c04e139292c0c9cadf0dc1b06f3e215b533429d9ef18b22aed",
+    "dalion_demo.py": "966d1fbbd65d39877e706cb48f5eb60fcfe4ffdf75bf881028313a7053aff694",
+    "dalion_exchange.py": "25b18f94be7a1df8242f4c758ac6ffbc4175d9a472e563a20afe354f41558a4f",
+    "demo_scenarios.py": "fb686d89905767f622cb71ebae88f62ad13cda675af58c188cc4a9e44095ecdb",
+    "exchange_review.py": "4435aa8d600196002ffe9cd694baae00270a62c606c6270633942fd349765c9b",
+    "interaction.py": "ba6dd5aeafc8aa4a89d6366f180299419bf9b0766080905abde895ffffd528ad",
+    "interaction_ui.py": "c5e084bb24d017ebbe34ac80fc30a31a9963cac646083b1958548fcd939c148e",
+    "navigation.py": "4e3e907e3ff4e98675bd4746316c5cef3ed7acad9af42b7f2e4816e8da78990f",
+    "operations.py": "8177f9578974a993c7d6f3614408162236d2c0bfc43d7879c9ada023aaa9eeeb",
+    "operations_ui.py": "bc874f64f94f961fa9223a342b7762b3110002e13c8ac7075a524a47e34e785c",
+    "package_release.py": "aba8e0b2cc6e7978c5b4b799818383c8d3afb0f3d398279ea720320f64e611de",
+    "release_checks.py": "f83f38518d25143bd9f368dd8221b5dcf151cba8d771997695ac128a39d6a8d9",
+    "requirements-build.txt": "41f5ca92a673d8177b0d11a1875d68aaa86a9677eaf7e01a6bce0acacfc185eb",
+    "requirements.txt": "e9d8eeb2fb3db989705fcd3bfd83fac0e231f87fe819cb0189205795449a227e",
+    "ui_theme.py": "68a4f9cc67315553408f1823e82650d2b9bb2c05c821fae2dc27179fa4d4ec47",
+    "verify.py": "816891923e3231af59cce5a026cccd2b23047d9e94798ce59f6fe69627197ddb",
+    "workflows.py": "4de74827497daab5b44673b8b374c8aa7d4ff09ae1c9ccdda2e764f38f526241"
+  },
+  "source_git_blob_sha256": {
+    "analytics_data.py": "608c69b64932b2d86b830553e9adb45876fdc24292cfdff4ae6973885043dbae",
+    "analytics_view.py": "89f1259eb0b7b1260a18f85c7cdfabab0e188d489c4ce758f75fccd27589b028",
+    "app.py": "34693c1174f98e033b002f17bed8861e662b3aef31d9a3367187cd31d52892b1",
+    "assets/fonts/Inter.ttf": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031",
+    "assets/fonts/OFL.txt": "5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57",
+    "assets/icons/check.svg": "b40583b13a819d2d55aedf2fa20152f612a04f0304a652424325b8c663fb41f6",
+    "assets/icons/chevron-down.svg": "1bafc2c35ebf0b7cc01d54786788a3932776c85af1608fd8685f544d6009e3ae",
+    "assets/icons/chevron-up.svg": "569e5f9927155a70d623d34a1b63f77c8337fbbe5ea61200f383310faea77575",
+    "assets/krona-wordmark.png": "0979f9aae1441a5b3181d293b661163775c2c349ab81c4534bed78e098b2440f",
+    "build.py": "18181d315dafa34dce874b5df8c204b71a58bac34edac18f2c4dff851b52f173",
+    "charts.py": "ca0e57eaed9a1e884cab712d64ea15b0c89a6eee0b82e3028acb562f653d0ff4",
+    "core.py": "c1b2ef6740d31c751ab8d023f52e30518a02f74bb83cb19f7090577e13b9f15e",
+    "customer_demo.py": "b5fcfa749a3ce0c04e139292c0c9cadf0dc1b06f3e215b533429d9ef18b22aed",
+    "dalion_demo.py": "966d1fbbd65d39877e706cb48f5eb60fcfe4ffdf75bf881028313a7053aff694",
+    "dalion_exchange.py": "25b18f94be7a1df8242f4c758ac6ffbc4175d9a472e563a20afe354f41558a4f",
+    "demo_scenarios.py": "fb686d89905767f622cb71ebae88f62ad13cda675af58c188cc4a9e44095ecdb",
+    "exchange_review.py": "4435aa8d600196002ffe9cd694baae00270a62c606c6270633942fd349765c9b",
+    "interaction.py": "ba6dd5aeafc8aa4a89d6366f180299419bf9b0766080905abde895ffffd528ad",
+    "interaction_ui.py": "c5e084bb24d017ebbe34ac80fc30a31a9963cac646083b1958548fcd939c148e",
+    "navigation.py": "4e3e907e3ff4e98675bd4746316c5cef3ed7acad9af42b7f2e4816e8da78990f",
+    "operations.py": "8177f9578974a993c7d6f3614408162236d2c0bfc43d7879c9ada023aaa9eeeb",
+    "operations_ui.py": "bc874f64f94f961fa9223a342b7762b3110002e13c8ac7075a524a47e34e785c",
+    "package_release.py": "aba8e0b2cc6e7978c5b4b799818383c8d3afb0f3d398279ea720320f64e611de",
+    "release_checks.py": "f83f38518d25143bd9f368dd8221b5dcf151cba8d771997695ac128a39d6a8d9",
+    "requirements-build.txt": "41f5ca92a673d8177b0d11a1875d68aaa86a9677eaf7e01a6bce0acacfc185eb",
+    "requirements.txt": "e9d8eeb2fb3db989705fcd3bfd83fac0e231f87fe819cb0189205795449a227e",
+    "ui_theme.py": "68a4f9cc67315553408f1823e82650d2b9bb2c05c821fae2dc27179fa4d4ec47",
+    "verify.py": "816891923e3231af59cce5a026cccd2b23047d9e94798ce59f6fe69627197ddb",
+    "workflows.py": "4de74827497daab5b44673b8b374c8aa7d4ff09ae1c9ccdda2e764f38f526241"
+  }
+}

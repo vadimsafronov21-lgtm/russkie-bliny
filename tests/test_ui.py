@@ -30,7 +30,7 @@ def test_recalculation_keeps_manual_edits_and_offline_draft(tmp_path,application
 def test_seller_filters_forecast_tabs_and_confirmation(tmp_path,application):
     store=Store(tmp_path/'navigation.sqlite3'); store.seed()
     window=MainWindow(store); window.show(); application.processEvents()
-    QTest.mouseClick(window.stock_view_tabs[1],Qt.MouseButton.LeftButton)
+    QTest.mouseClick(window.side_buttons['inventory'],Qt.MouseButton.LeftButton)
     QTest.mouseClick(window.stock_tabs[1],Qt.MouseButton.LeftButton)
     assert window.stock_table.rowCount()==sum(r['packs']>0 for r in window.snapshot['rows'])
     window.search.setText('Икра')
@@ -54,6 +54,7 @@ def test_chart_periods_months_and_dish_drilldown(tmp_path,application):
     store=Store(tmp_path/'charts.sqlite3'); store.seed()
     window=MainWindow(store); window.show(); application.processEvents()
     panel=window.analytics
+    QTest.mouseClick(window.domain_buttons['demand'],Qt.MouseButton.LeftButton)
     assert window.stock_views.currentIndex()==0
     QTest.mouseClick(panel.period_buttons[0],Qt.MouseButton.LeftButton)
     assert panel.payload['length']==14 and len(panel.payload['actual'])==14
@@ -199,3 +200,25 @@ def test_fast_tooltip_policy(application):
     assert application.style().styleHint(QStyle.StyleHint.SH_ToolTip_WakeUpDelay)==100
     assert not application.isEffectEnabled(Qt.UIEffect.UI_FadeTooltip)
     assert not application.isEffectEnabled(Qt.UIEffect.UI_AnimateTooltip)
+
+
+@pytest.mark.parametrize('custom',[False,True])
+def test_assortment_reason_selection_and_custom_input_reach_audit(tmp_path,application,custom):
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QDoubleSpinBox
+    from workflows import ReasonPicker,ITEM_SETTING_REASONS
+    store=Store(tmp_path/'assortment.sqlite3'); store.seed(); window=MainWindow(store)
+    window.item_settings.selectRow(0); captured=[]
+    def edit():
+        dialog=application.activeModalWidget(); picker=dialog.findChild(ReasonPicker,'assortmentReason')
+        assert picker.text()==''
+        if custom: picker.setText('Уточнили тару на этой точке')
+        else: picker.setCurrentIndex(picker.findText(ITEM_SETTING_REASONS[0]))
+        captured.append(picker.text()); dialog.findChildren(QDoubleSpinBox)[0].setValue(2)
+        dialog.findChild(QDialogButtonBox).button(QDialogButtonBox.StandardButton.Save).click()
+    QTimer.singleShot(0,edit); window._edit_item_setting()
+    assert captured
+    assert store.db.execute("SELECT reason FROM audit WHERE kind='Параметры ассортимента' ORDER BY id DESC LIMIT 1").fetchone()[0]==captured[0]
+    assert store.get('reason_history:assortment')[0]==captured[0]
+    assert store.get('tables')['items'][0]['pack']==2
+    window.close(); store.db.close()

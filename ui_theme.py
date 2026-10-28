@@ -63,13 +63,21 @@ def configure_application(app):
 STYLE='''
 * { font-family: "Inter", "Segoe UI"; font-size: 13px; color: #111E30; }
 QMainWindow { background: #F6F6F8; }
+QFrame#workspaceHeader { background: #FFFFFF; border-bottom: 1px solid #E9E8ED; }
+QFrame#operatorProfile { background: transparent; border: none; }
+QFrame#profileDivider { background: #DFE2E7; border: none; }
+QLabel#operatorAvatar { background: #F9E8EB; color: #A4002A; border-radius: 17px; font-size: 13px; font-weight: 600; }
+QLabel#operatorName { color: #111E30; font-size: 12px; font-weight: 600; }
+QLabel#operatorContext { color: #777C89; font-size: 10px; }
+QLabel#workspacePath { color: #9996A5; font-size: 10px; }
+QLabel#workspaceStatus { color: #9598A3; font-size: 10px; }
 QDialog { background: #FFFFFF; }
 QWidget#sidebar { background: #FFFFFF; border-right: 1px solid #E9E8ED; }
-QWidget#sidebar QPushButton { text-align: left; padding: 12px 17px; background: transparent; border: 1px solid transparent; border-radius: 8px; color: #6F7582; font-weight: 500; }
+QWidget#sidebar QPushButton { text-align: left; padding: 12px 10px; background: transparent; border: 1px solid transparent; border-radius: 8px; color: #6F7582; font-size: 12px; font-weight: 500; }
 QWidget#sidebar QPushButton:hover { background: #F7F0F1; color: #80041E; }
 QWidget#sidebar QPushButton:checked { background: #F9E8EB; color: #A4002A; font-weight: 600; }
 QLabel#workspace { font-size: 11px; color: #9295A1; letter-spacing: 1px; }
-QLabel#title { font-size: 34px; font-weight: 650; letter-spacing: -1px; }
+QLabel#title { font-size: 30px; font-weight: 600; letter-spacing: -0.7px; }
 QLabel#subtitle { color: #777C89; font-size: 12px; }
 QLabel#eyebrow { color: #9396A1; font-size: 10px; font-weight: 600; letter-spacing: 1px; }
 QLabel#demo { background: #F9E8EB; border-radius: 5px; color: #80041E; padding: 6px 11px; font-size: 11px; font-weight: 500; }
@@ -80,7 +88,7 @@ QLabel#number { font-size: 30px; font-weight: 600; letter-spacing: -1px; }
 QLabel#metricAlert { font-size: 30px; font-weight: 600; color: #A4002A; letter-spacing: -1px; }
 QLabel#metricIndex { font-size: 11px; color: #AE9DA4; }
 QLabel#total { font-size: 29px; font-weight: 600; letter-spacing: -0.8px; }
-QFrame#surface, QFrame#card { background: #FFFFFF; border: 1px solid #E9E8ED; border-radius: 12px; }
+QFrame#surface, QFrame#card { background: #FFFFFF; border: 1px solid #EFEBF1; border-radius: 20px; }
 QFrame#chartCard { background: #FFFFFF; border: 1px solid #EFEBF1; border-radius: 21px; }
 QFrame#viewSwitch { background: #ECE8F0; border: none; border-radius: 10px; }
 QPushButton#viewMode { background: transparent; color: #95899D; border: none; border-radius: 7px; padding: 8px 17px; font-size: 12px; }
@@ -94,10 +102,10 @@ QPushButton#period { background: #F5F2F6; color: #8F8492; border: none; border-r
 QPushButton#period:checked { background: #F9E8EB; color: #A4002A; font-weight: 600; }
 QPushButton#period:disabled { color: #C3BBC6; background: #F7F5F8; }
 QFrame#flat { background: #FFFFFF; border: none; }
-QFrame#delivery { background: #A4002A; border: none; border-radius: 12px; }
-QFrame#delivery QLabel { color: #FFFFFF; background: transparent; }
-QFrame#delivery QLabel#deliveryMeta { color: #EAC8D1; font-size: 11px; }
-QFrame#delivery QLabel#deliveryDate { font-size: 36px; font-weight: 550; letter-spacing: -1px; }
+QFrame#delivery { background: #FFFFFF; border: 1px solid #EFEBF1; border-radius: 20px; }
+QFrame#delivery QLabel { color: #111E30; background: transparent; }
+QFrame#delivery QLabel#deliveryMeta { color: #98909E; font-size: 11px; }
+QFrame#delivery QLabel#deliveryDate { font-size: 30px; font-weight: 550; letter-spacing: -1px; }
 QFrame#delivery QPushButton { background: #FFFFFF; color: #A4002A; border: none; font-weight: 600; }
 QFrame#rail { background: #F0EFF3; border: none; border-radius: 10px; }
 QFrame#separator { background: #E9E8ED; border: none; min-height: 1px; max-height: 1px; }

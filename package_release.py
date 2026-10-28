@@ -25,10 +25,10 @@ if test_report.exists():
     report['tests']={'passed':tests-skipped,'failed':failures,'skipped':skipped}
 report.update(windowed_exe_smoke=smoke,
               binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
-              source_sha256={name:hashlib.sha256((root/name).read_bytes()).hexdigest() for name in ['app.py','core.py','ui_theme.py','charts.py','analytics_data.py','analytics_view.py']},
+              source_sha256={name:hashlib.sha256((root/name).read_bytes()).hexdigest() for name in ['app.py','navigation.py','workflows.py','core.py','ui_theme.py','charts.py','analytics_data.py','analytics_view.py']},
               packaging='One-file Windows x64; isolated DLL search path via build.py')
 report_path.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
-files=['README.md','DATA_FORMAT.md','PILOT.md','DESIGN.md','.gitignore','.gitattributes','app.py','core.py','ui_theme.py','charts.py','analytics_data.py','analytics_view.py','requirements.txt','build.py','verify.py',
+files=['README.md','DATA_FORMAT.md','PILOT.md','DESIGN.md','.gitignore','.gitattributes','app.py','navigation.py','workflows.py','core.py','ui_theme.py','charts.py','analytics_data.py','analytics_view.py','requirements.txt','build.py','verify.py',
        'package_release.py','pytest.ini','run.cmd','qa/verification.json','qa/visual-review.json','qa/sample_order.xlsx',
        'qa/final-smoke/smoke-result.json','dist/RusskieBliny.exe']
 for folder in ['templates','examples','tests','qa/screens','assets']:

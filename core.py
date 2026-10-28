@@ -145,6 +145,11 @@ def validate(tables, existing=None):
                     if f in r: r[f]=str(r[f]).strip()
             except DataError as e: errors.append(f'{kind}, строка {i}: {e}')
     points={str(r['id']) for r in merged['points']}
+    recipe_dates=defaultdict(set)
+    for row in merged['recipes']:
+        recipe_dates[(str(row['dish']),str(row['version']))].add(str(row['valid_from']))
+    if any(len(dates)>1 for dates in recipe_dates.values()):
+        errors.append('Одна версия техкарты должна иметь одну дату начала действия')
     items={str(r['id']):r for r in merged['items']}
     for kind,rows in merged.items():
         for i,r in enumerate(rows,2):
@@ -211,6 +216,7 @@ class Store:
         merged={**existing,**tables}
         with self.db:
             self.put('tables',merged)
+            self.put('exchange_base',merged)
             self.put('demo',adapter.is_demo)
             self.put('seeded_demo',False)
             self.put('import_time',now())
@@ -471,7 +477,11 @@ def order_impact(payload, row, packs):
                       target_gap=max(0,row['target']-projection['closing']))
     return projection
 
-def calculate(tables,point,day,settings):
+def calculate(tables,point,day,settings,*,demand_multiplier=1,extra_orders=None):
+    demand_multiplier=number(demand_multiplier,'Множитель сценария')
+    extra_orders={str(k):number(v,'Порции разового заказа') for k,v in (extra_orders or {}).items()}
+    dish_ids={str(r['id']) for r in tables.get('items',[]) if r['kind']=='dish'}
+    if set(extra_orders)-dish_ids: raise DataError('Блюдо разового заказа не сопоставлено')
     schedules=[r for r in tables.get('schedules',[]) if str(r['point'])==point]
     if not schedules: raise DataError('Нет графика поставок для этой точки')
     schedule=schedules[0]
@@ -484,6 +494,10 @@ def calculate(tables,point,day,settings):
     for item in tables.get('items',[]):
         if item['kind']!='dish': continue
         f=predict(history(tables,point,str(item['id']),day),days,settings,float(item['fallback']))
+        extra=extra_orders.get(str(item['id']),0)
+        if demand_multiplier!=1 or extra:
+            f['daily']=[value*demand_multiplier+(extra if j==0 else 0) for j,value in enumerate(f['daily'])]
+            for field in ('expected','low','high'): f[field]=f[field]*demand_multiplier+extra
         f.update(id=item['id'],name=item['name']); forecasts.append(f)
         for j,d in enumerate(days):
             rec=active_recipes(tables,str(item['id']),d)

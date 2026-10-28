@@ -13,6 +13,9 @@ ORDER_REASONS=['Ожидается большой заказ','Ожидаетс�
     'Ограничено место хранения','Возврат к рекомендации']
 STOCK_REASONS=['Плановая сверка остатков','Расхождение при пересчёте','Списание по решению продавца',
     'Повреждение упаковки','Партия исключена по пригодности','Исправление ошибки ввода']
+ITEM_SETTING_REASONS=['Изменилась упаковка поставщика','Уточнён целевой запас',
+    'Настройка резерва для нового блюда','Корректировка по фактическому спросу',
+    'Обновлена технологическая карта','Исправление ошибки ввода']
 
 class ReasonPicker(QComboBox):
     def __init__(self,presets=ORDER_REASONS,recent=(),parent=None):
@@ -145,7 +148,7 @@ def readable_change(value):
            'recent_days':'Свежих наблюдений','pack':'Упаковка','target':'Цель','fallback':'Резерв порций/день',
            'points':'Точки','items':'Ассортимент','sales':'Продажи','batches':'Партии','recipes':'Техкарты','deliveries':'Поставки в пути','movements':'Движения'}
     if isinstance(value,dict):
-        return '\n'.join(f'{names.get(k,k)}: {readable_change(v)}' for k,v in value.items() if k not in ('inventory_inputs','projection','daily_demand','draft_id'))
+        return '\n'.join(f'{names.get(k,k)}: {readable_change(v)}' for k,v in value.items() if k not in ('inventory_inputs','projection','daily_demand','draft_id','_undo'))
     if isinstance(value,list): return '\n'.join(readable_change(v) for v in value) or '—'
     if isinstance(value,float): return num(value,3)
     return str(value)
