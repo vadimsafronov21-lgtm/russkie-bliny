@@ -1,10 +1,10 @@
 """Exercise bundled operator modules from --smoke on an isolated demo database."""
-from datetime import date
+from datetime import date,timedelta
 import json
 from pathlib import Path
 import sys
 
-from PySide6.QtWidgets import QDialog
+from PySide6.QtWidgets import QDialog,QPushButton
 
 from core import DataError,FileAdapter,Store,now,write_templates
 from dalion_demo import DalionDemoDialog
@@ -31,10 +31,23 @@ def run_feature_checks(window,folder,application):
         startup_window.stock_table.selectRow(0); startup_window.open_selected_card()
         assert '14.00' in startup_window.ingredient_card.summary.text()
         assert startup_store.get('tables')==tables
+        application.processEvents()
         startup_window.grab().save(str(folder/'startup-existing-data.png'))
+        startup_window.select_route('stock','settings'); application.processEvents()
+        save=next(button for button in startup_window.findChildren(QPushButton) if button.text()=='Сохранить настройки')
+        revision=startup_store.get('revision'); save.click(); application.processEvents()
+        assert startup_window.settings_error.isVisible() and startup_store.get('revision')==revision
+        assert startup_store.get('tables')==tables
+        startup_window.grab().save(str(folder/'settings-invalid-date.png'))
+        startup_window.delivery_input.setDate(date.today()+timedelta(days=1)); save.click(); application.processEvents()
+        assert startup_window.snapshot and not startup_window.calculation_error
+        assert startup_window.active_view=='inventory' and len(startup_window.snapshot['rows'])==7 and startup_window.stock_table.rowCount()>0
+        assert not startup_window.problem_box.isVisible() and startup_window.analytics.payload['forecast']
+        startup_window.grab().save(str(folder/'settings-save-updated-data.png'))
     finally:
         startup_window.close(); startup_window.deleteLater(); application.processEvents(); startup_store.db.close()
     steps.append('startup actual stock with expired schedule and saved workspace')
+    steps.append('settings button rejects expired dates and immediately refreshes data')
     blank=folder/'blank-template'; write_templates(blank)
     try:
         FileAdapter().read(blank/'import_template.xlsx')

@@ -1,12 +1,12 @@
 {
-  "release": "2026-10-28-startup-fix",
-  "created": "2026-10-28T21:02:56+07:00",
-  "base_commit": "e758b26efc34209a91f0224193ff1b0bd5bc6ea4",
+  "release": "2026-10-28-settings-fix",
+  "created": "2026-10-28T21:20:25+07:00",
+  "base_commit": "1bf6f8400a5574d3f8f464ca773be36c7098d9a2",
   "binary": {
     "path": "dist/RusskieBliny.exe",
     "desktop_filename": "Русские блины.exe",
-    "sha256": "de370af9e487e6b70fe41f7990d1882bdd5cb6f44b704619a10e27105f5bbce0",
-    "bytes": 49682287,
+    "sha256": "88d45615da54e8a578798bdd26b431c6e64eec80127f387fd98f740867f23719",
+    "bytes": 49686647,
     "platform": "Windows x64",
     "subsystem": "Windows GUI",
     "packaging": "PyInstaller --onefile --windowed; includes Python, Qt and assets"
@@ -16,16 +16,16 @@
     "pyinstaller": "6.22.3",
     "pyside6": "6.12.0",
     "openpyxl": "3.1.5",
-    "command": ".venv/Scripts/python.exe build.py --distpath qa/startup-fix-build; verified binary copied to dist"
+    "command": ".venv/Scripts/python.exe build.py --distpath qa/settings-fix-build; verified binary copied to dist"
   },
   "tests": {
     "status": "PASS",
-    "tests": 169,
+    "tests": 176,
     "errors": 0,
     "failures": 0,
     "skipped": 0,
-    "seconds": 391.636,
-    "report": "qa/startup-fix-evidence/tests.xml"
+    "seconds": 452.306,
+    "report": "qa/settings-fix-evidence/tests.xml"
   },
   "smoke": {
     "source": {
@@ -44,7 +44,7 @@
         "SQLite backup"
       ],
       "order_id": 1,
-      "time": "2026-10-28T20:58:06+07:00"
+      "time": "2026-10-28T21:13:34+07:00"
     },
     "exe": {
       "status": "PASS",
@@ -62,16 +62,17 @@
         "SQLite backup"
       ],
       "order_id": 1,
-      "time": "2026-10-28T20:58:27+07:00"
+      "time": "2026-10-28T21:16:59+07:00"
     }
   },
   "features": {
     "source": {
       "status": "PASS",
       "frozen": false,
-      "time": "2026-10-28T20:58:06+07:00",
+      "time": "2026-10-28T21:13:34+07:00",
       "steps": [
         "startup actual stock with expired schedule and saved workspace",
+        "settings button rejects expired dates and immediately refreshes data",
         "file import button and empty-template protection",
         "daily actions",
         "isolated what-if calculation",
@@ -92,9 +93,10 @@
     "exe": {
       "status": "PASS",
       "frozen": true,
-      "time": "2026-10-28T20:58:27+07:00",
+      "time": "2026-10-28T21:16:59+07:00",
       "steps": [
         "startup actual stock with expired schedule and saved workspace",
+        "settings button rejects expired dates and immediately refreshes data",
         "file import button and empty-template protection",
         "daily actions",
         "isolated what-if calculation",
@@ -123,7 +125,7 @@
   "source_sha256": {
     "analytics_data.py": "608c69b64932b2d86b830553e9adb45876fdc24292cfdff4ae6973885043dbae",
     "analytics_view.py": "89f1259eb0b7b1260a18f85c7cdfabab0e188d489c4ce758f75fccd27589b028",
-    "app.py": "830e0ced554045cd9de4c469c034bc6edb2d746ea2fd5c8c5d6152b0bb2c3a3f",
+    "app.py": "c26871b8a71d2b3277d6a2bfcb5d96fa86bfb39fd4b58c853a03a3ee257b1399",
     "assets/fonts/Inter.ttf": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031",
     "assets/fonts/OFL.txt": "5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57",
     "assets/icons/check.svg": "b40583b13a819d2d55aedf2fa20152f612a04f0304a652424325b8c663fb41f6",
@@ -144,7 +146,7 @@
     "operations.py": "8177f9578974a993c7d6f3614408162236d2c0bfc43d7879c9ada023aaa9eeeb",
     "operations_ui.py": "bc874f64f94f961fa9223a342b7762b3110002e13c8ac7075a524a47e34e785c",
     "package_release.py": "aba8e0b2cc6e7978c5b4b799818383c8d3afb0f3d398279ea720320f64e611de",
-    "release_checks.py": "ef8436e49b232f4691dfa35be8db4b65a45d9f777933b1ed7daeb3d2a1cea4f0",
+    "release_checks.py": "2922fc784df9f74f6b40aeb8d2673b76298076afa4d0f073718f17701b36dd69",
     "requirements-build.txt": "41f5ca92a673d8177b0d11a1875d68aaa86a9677eaf7e01a6bce0acacfc185eb",
     "requirements.txt": "e9d8eeb2fb3db989705fcd3bfd83fac0e231f87fe819cb0189205795449a227e",
     "ui_theme.py": "68a4f9cc67315553408f1823e82650d2b9bb2c05c821fae2dc27179fa4d4ec47",
@@ -154,7 +156,7 @@
   "source_git_blob_sha256": {
     "analytics_data.py": "608c69b64932b2d86b830553e9adb45876fdc24292cfdff4ae6973885043dbae",
     "analytics_view.py": "89f1259eb0b7b1260a18f85c7cdfabab0e188d489c4ce758f75fccd27589b028",
-    "app.py": "5b2e8db08ad3ff793b6d7b02dc7169133801a1d1f29ac05149f8d2f292044846",
+    "app.py": "2fb933aed9991c121f67b7f6b54bfe807cd059ab5bb58ad06be1e97df9e359e9",
     "assets/fonts/Inter.ttf": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031",
     "assets/fonts/OFL.txt": "5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57",
     "assets/icons/check.svg": "b40583b13a819d2d55aedf2fa20152f612a04f0304a652424325b8c663fb41f6",
@@ -175,7 +177,7 @@
     "operations.py": "8177f9578974a993c7d6f3614408162236d2c0bfc43d7879c9ada023aaa9eeeb",
     "operations_ui.py": "bc874f64f94f961fa9223a342b7762b3110002e13c8ac7075a524a47e34e785c",
     "package_release.py": "aba8e0b2cc6e7978c5b4b799818383c8d3afb0f3d398279ea720320f64e611de",
-    "release_checks.py": "ef8436e49b232f4691dfa35be8db4b65a45d9f777933b1ed7daeb3d2a1cea4f0",
+    "release_checks.py": "2922fc784df9f74f6b40aeb8d2673b76298076afa4d0f073718f17701b36dd69",
     "requirements-build.txt": "41f5ca92a673d8177b0d11a1875d68aaa86a9677eaf7e01a6bce0acacfc185eb",
     "requirements.txt": "e9d8eeb2fb3db989705fcd3bfd83fac0e231f87fe819cb0189205795449a227e",
     "ui_theme.py": "68a4f9cc67315553408f1823e82650d2b9bb2c05c821fae2dc27179fa4d4ec47",
@@ -200,7 +202,10 @@
     "Exercise the import button in packaged smoke checks",
     "Display actual stock without a valid replenishment schedule",
     "Keep saved drafts and manual edits when restoring startup workspace",
-    "Keep unknown forecast values empty and require an explicit schedule correction"
+    "Keep unknown forecast values empty and require an explicit schedule correction",
+    "Reject an invalid delivery date before saving any settings",
+    "Show delivery controls near the top and refresh data after saving",
+    "Recalculate unconfirmed drafts preserving manual edits and leave confirmed orders unchanged"
   ],
   "startup_database_diagnostic": {
     "stock_rows": 7,
@@ -210,5 +215,14 @@
     "tables_unchanged": true,
     "revision_unchanged": true,
     "draft_unchanged": true
+  },
+  "settings_existing_database_diagnostic": {
+    "invalid_date_rejected_without_writes": true,
+    "valid_date_applied": true,
+    "active_view": "inventory",
+    "stock_rows": 7,
+    "manual_edits_preserved": true,
+    "draft_current_revision": true,
+    "forecast_ready": true
   }
 }

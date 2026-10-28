@@ -36,3 +36,7 @@ qa/startup-fix-build/
 qa/startup-fix-source-smoke/
 qa/startup-fix-exe-smoke/
 qa/startup-fix-tests.xml
+qa/settings-fix-build/
+qa/settings-fix-source-smoke/
+qa/settings-fix-exe-smoke/
+qa/settings-fix-tests.xml

@@ -1,0 +1,9 @@
+{
+  "invalid_date_rejected_without_writes": true,
+  "valid_date_applied": true,
+  "active_view": "inventory",
+  "stock_rows": 7,
+  "manual_edits_preserved": true,
+  "draft_current_revision": true,
+  "forecast_ready": true
+}

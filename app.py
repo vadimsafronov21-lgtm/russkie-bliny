@@ -86,6 +86,8 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
             self.reload()
     def resolve_problem(self):
         self.navigate(4 if self.calculation_error and 'постав' in self.calculation_error.lower() else 2)
+        if self.active_view=='settings':
+            self.settings_scroll.ensureWidgetVisible(self.delivery_input); self.delivery_input.setFocus()
     def page(self,title,subtitle):
         p=QWidget(); box=QVBoxLayout(p); box.setContentsMargins(0,0,0,0); box.setSpacing(18)
         heading=QHBoxLayout(); heading.setSpacing(20); wording=QVBoxLayout(); wording.setSpacing(7)
@@ -521,23 +523,30 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
         main=QHBoxLayout(); main.setSpacing(20)
         frame=QFrame(); frame.setObjectName('surface'); frame.setMaximumWidth(475); pane=QVBoxLayout(frame); pane.setContentsMargins(24,23,24,23); pane.setSpacing(18); pane.addWidget(label('Точка и прогноз','section')); form=QFormLayout(); form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows); form.setSpacing(9)
         form.addRow('Точка терминала',self.point)
+        self.settings_error=label('','notice'); self.settings_error.setWordWrap(True); self.settings_error.hide(); pane.addWidget(self.settings_error)
         self.point.setToolTip('Контекст данных терминала. Это настройка, а не механизм авторизации.')
-        settings=self.store.get('settings',{}); self.author_input=QLineEdit(settings.get('author','Продавец')); form.addRow('Имя для журнала изменений',self.author_input)
-        self.terminal_input=QLineEdit(settings.get('terminal_name','')); self.terminal_input.setPlaceholderText('Например: Терминал 01'); self.terminal_input.setToolTip('Подпись в профиле. Если не задана, показывается имя компьютера.'); form.addRow('Название терминала',self.terminal_input)
-        self.date_input=QDateEdit(); self.date_input.setCalendarPopup(True); self.date_input.setDate(self.calc_day()); self.date_input.setDisplayFormat('dd.MM.yyyy'); form.addRow('Дата расчёта',self.date_input)
+        settings=self.store.get('settings',{}); self.author_input=QLineEdit(settings.get('author','Продавец'))
+        self.terminal_input=QLineEdit(settings.get('terminal_name','')); self.terminal_input.setPlaceholderText('Например: Терминал 01'); self.terminal_input.setToolTip('Подпись в профиле. Если не задана, показывается имя компьютера.')
+        self.date_input=QDateEdit(); self.date_input.setCalendarPopup(True); self.date_input.setDate(self.calc_day()); self.date_input.setDisplayFormat('dd.MM.yyyy')
         self.today_check=QCheckBox('Всегда использовать сегодняшнюю дату'); self.today_check.setChecked(settings.get('date_mode')!='manual')
-        self.date_input.setEnabled(not self.today_check.isChecked()); self.today_check.toggled.connect(lambda checked:self.date_input.setEnabled(not checked)); form.addRow(self.today_check)
-        self.share_input=QDoubleSpinBox(); self.share_input.setRange(.1,1); self.share_input.setSingleStep(.05); self.share_input.setValue(settings.get('regular_share',.6)); form.addRow('Доля дней с продажами для регулярного спроса',self.share_input)
-        self.recent_input=QSpinBox(); self.recent_input.setRange(7,90); self.recent_input.setValue(settings.get('recent_days',28)); form.addRow('Окно свежего спроса, наблюдений',self.recent_input)
-        self.schedule_check=QCheckBox('График для этой точки задан'); form.addRow(self.schedule_check)
-        self.delivery_input=QDateEdit(); self.delivery_input.setCalendarPopup(True); self.delivery_input.setDisplayFormat('dd.MM.yyyy'); form.addRow('Ближайшая поставка',self.delivery_input)
-        self.interval_input=QSpinBox(); self.interval_input.setRange(1,60); form.addRow('Интервал между поставками, дней',self.interval_input)
+        self.date_input.setEnabled(not self.today_check.isChecked()); self.today_check.toggled.connect(lambda checked:self.date_input.setEnabled(not checked))
+        self.share_input=QDoubleSpinBox(); self.share_input.setRange(.1,1); self.share_input.setSingleStep(.05); self.share_input.setValue(settings.get('regular_share',.6))
+        self.recent_input=QSpinBox(); self.recent_input.setRange(7,90); self.recent_input.setValue(settings.get('recent_days',28))
+        self.schedule_check=QCheckBox('График для этой точки задан')
+        self.delivery_input=QDateEdit(); self.delivery_input.setCalendarPopup(True); self.delivery_input.setDisplayFormat('dd.MM.yyyy')
+        self.interval_input=QSpinBox(); self.interval_input.setRange(1,60)
+        form.addRow('Дата расчёта',self.date_input); form.addRow(self.today_check)
+        form.addRow(self.schedule_check); form.addRow('Ближайшая поставка',self.delivery_input); form.addRow('Интервал между поставками, дней',self.interval_input)
+        self.schedule_hint=label('','notice'); self.schedule_hint.setWordWrap(True); form.addRow(self.schedule_hint)
+        form.addRow('Имя для журнала изменений',self.author_input); form.addRow('Название терминала',self.terminal_input)
+        form.addRow('Доля дней с продажами для регулярного спроса',self.share_input); form.addRow('Окно свежего спроса, наблюдений',self.recent_input)
+        for signal in (self.delivery_input.dateChanged,self.date_input.dateChanged,self.today_check.toggled,self.schedule_check.toggled): signal.connect(self.update_schedule_hint)
         self.schedule_check.toggled.connect(self.delivery_input.setEnabled); self.schedule_check.toggled.connect(self.interval_input.setEnabled); self.load_point_schedule()
         pane.addLayout(form); technical=label('Проверьте график при переходе на новый день. Прошедшая поставка не переносится автоматически.','subtitle'); technical.setWordWrap(True); pane.addWidget(technical)
         pane.addWidget(label('Резервные копии','section'))
         pane.addWidget(button('Создать резервную копию',self.backup_data)); pane.addWidget(button('Восстановить из копии',self.restore_data))
         self.backup_hint=label('Копия включает данные, заявки и журнал. Перед восстановлением текущая база сохраняется отдельно.','subtitle'); self.backup_hint.setWordWrap(True); pane.addWidget(self.backup_hint); pane.addStretch()
-        settings_scroll=QScrollArea(); settings_scroll.setWidgetResizable(True); settings_scroll.setFrameShape(QFrame.Shape.NoFrame); settings_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff); settings_scroll.setWidget(frame); main.addWidget(settings_scroll,2)
+        self.settings_scroll=QScrollArea(); self.settings_scroll.setWidgetResizable(True); self.settings_scroll.setFrameShape(QFrame.Shape.NoFrame); self.settings_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff); self.settings_scroll.setWidget(frame); main.addWidget(self.settings_scroll,2)
         right=QVBoxLayout(); right.setSpacing(14); right.addWidget(label('Ассортимент и упаковки','section'))
         self.item_settings=table(['Позиция','Ед.','Тара','Цель','Резерв / день']); self.item_settings.doubleClicked.connect(self.edit_item_setting); self.item_settings.empty_text('Ассортимент не загружен','Загрузите справочник items на экране «Данные»')
         surface=QFrame(); surface.setObjectName('surface'); tablebox=QVBoxLayout(surface); tablebox.setContentsMargins(0,0,0,0); tablebox.addWidget(self.item_settings); right.addWidget(surface,1); self.fill_item_settings()
@@ -547,18 +556,46 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
         if not hasattr(self,'item_settings'): return
         self.config_items=self.store.get('tables',{}).get('items',[])
         fill(self.item_settings,[[r['name'],r['unit'],r['pack'],r['target'],r['fallback'] if r['kind']=='dish' else '—'] for r in self.config_items])
-    def save_settings(self): self.safe(self._save_settings)
+    def update_schedule_hint(self,*args):
+        day=date.today() if self.today_check.isChecked() else self.date_input.date().toPython()
+        arrival=self.delivery_input.date().toPython()
+        message=('График не задан. Сохранённые остатки доступны; для расчёта заявки задайте поставку.' if not self.schedule_check.isChecked() else
+                 f'Ближайшая поставка {arrival:%d.%m.%Y} раньше даты расчёта {day:%d.%m.%Y}. Укажите актуальную дату поставки.' if arrival<day else '')
+        self.schedule_hint.setText(message); self.schedule_hint.setVisible(bool(message)); self.settings_error.hide()
+
+    def save_settings(self):
+        try: self._save_settings()
+        except DataError as exc:
+            self.settings_error.setText(str(exc)); self.settings_error.show()
+            field=self.author_input if not self.author_input.text().strip() else self.delivery_input
+            self.settings_scroll.ensureWidgetVisible(field); field.setFocus()
+            self.notify('Настройки не сохранены. '+str(exc))
+        except (OSError,ValueError,KeyError,sqlite3.Error) as exc: self.error(exc)
     def _save_settings(self):
         if not self.author_input.text().strip(): raise DataError('Введите имя продавца')
         before=self.store.get('settings',{}); after={**before,'terminal_point':self.pid(),'terminal_name':self.terminal_input.text().strip(),'author':self.author_input.text().strip(),'date_mode':'today' if self.today_check.isChecked() else 'manual','calculation_date':self.date_input.date().toPython().isoformat(),'regular_share':self.share_input.value(),'recent_days':self.recent_input.value()}
         tables=self.store.get('tables',{}); schedule={'point':self.pid(),'next_delivery':self.delivery_input.date().toPython().isoformat(),'interval_days':self.interval_input.value()} if self.schedule_check.isChecked() else None
+        domain=self.active_domain; day=calculation_day(after)
+        if schedule:
+            arrival=date.fromisoformat(schedule['next_delivery'])
+            if arrival<day:
+                raise DataError(f'Ближайшая поставка {arrival:%d.%m.%Y} уже прошла относительно даты расчёта {day:%d.%m.%Y}. Измените именно поле «Ближайшая поставка».')
+            if (arrival-day).days+schedule['interval_days']>90:
+                raise DataError('Ближайшая поставка и интервал должны задавать период не более 90 дней от даты расчёта.')
         previous=[r for r in tables.get('schedules',[]) if str(r['point'])==self.pid()]
         tables['schedules']=[r for r in tables.get('schedules',[]) if str(r['point'])!=self.pid()]+([schedule] if schedule else [])
         with self.store.db:
             self.store.put('settings',after); self.store.put('tables',tables); self.store.put('revision',self.store.get('revision',0)+1)
             self.store.log('Настройки расчёта',{'settings':before,'schedules':previous},{'settings':after,'schedule':schedule},'Изменено продавцом',after['author'])
-        self.reload(); self.status.setText('Настройки сохранены. Черновик нужно пересчитать.')
-        self.notify('Настройки сохранены. Черновик нужно пересчитать.')
+        self.settings_error.hide(); self.reload()
+        if self.snapshot and not self.snapshot.get('errors'):
+            if self.current and not self.current.get('confirmed_order_id'):
+                self._make_order(); self.refresh_chart()
+            self.select_route(domain,'inventory' if domain=='stock' else 'dynamics')
+            self.notify('Настройки сохранены. Остатки и прогноз обновлены. Для подтверждения заявки повторно сверьте остатки.')
+        else:
+            problem=self.calculation_error or '; '.join((self.snapshot or {}).get('errors',[]))
+            self.notify('Настройки сохранены. '+('График не задан. ' if not schedule else '')+'Расчёт требует внимания: '+problem,[('Проверить данные',self.resolve_problem)])
     def edit_item_setting(self): self.safe(self._edit_item_setting)
     def _edit_item_setting(self):
         i=self.item_settings.currentRow()
