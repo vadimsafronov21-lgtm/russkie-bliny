@@ -1,12 +1,12 @@
 {
-  "release": "2026-10-28-import-fix",
-  "created": "2026-10-28T20:05:42+07:00",
-  "base_commit": "54e5ef5a44697a0eea1657c4dd3e142080c15ffc",
+  "release": "2026-10-28-startup-fix",
+  "created": "2026-10-28T21:02:56+07:00",
+  "base_commit": "e758b26efc34209a91f0224193ff1b0bd5bc6ea4",
   "binary": {
     "path": "dist/RusskieBliny.exe",
     "desktop_filename": "Русские блины.exe",
-    "sha256": "e307b559d7aa022ae7c76b1766700da369278eaaffc8754b606d4773adf16c84",
-    "bytes": 49677927,
+    "sha256": "de370af9e487e6b70fe41f7990d1882bdd5cb6f44b704619a10e27105f5bbce0",
+    "bytes": 49682287,
     "platform": "Windows x64",
     "subsystem": "Windows GUI",
     "packaging": "PyInstaller --onefile --windowed; includes Python, Qt and assets"
@@ -16,16 +16,16 @@
     "pyinstaller": "6.22.3",
     "pyside6": "6.12.0",
     "openpyxl": "3.1.5",
-    "command": ".venv/Scripts/python.exe build.py --distpath qa/import-fix-build; verified binary copied to dist"
+    "command": ".venv/Scripts/python.exe build.py --distpath qa/startup-fix-build; verified binary copied to dist"
   },
   "tests": {
     "status": "PASS",
-    "tests": 164,
+    "tests": 169,
     "errors": 0,
     "failures": 0,
     "skipped": 0,
-    "seconds": 330.944,
-    "report": "qa/import-fix-evidence/tests.xml"
+    "seconds": 391.636,
+    "report": "qa/startup-fix-evidence/tests.xml"
   },
   "smoke": {
     "source": {
@@ -44,7 +44,7 @@
         "SQLite backup"
       ],
       "order_id": 1,
-      "time": "2026-10-28T20:01:14+07:00"
+      "time": "2026-10-28T20:58:06+07:00"
     },
     "exe": {
       "status": "PASS",
@@ -62,15 +62,16 @@
         "SQLite backup"
       ],
       "order_id": 1,
-      "time": "2026-10-28T20:03:39+07:00"
+      "time": "2026-10-28T20:58:27+07:00"
     }
   },
   "features": {
     "source": {
       "status": "PASS",
       "frozen": false,
-      "time": "2026-10-28T20:01:14+07:00",
+      "time": "2026-10-28T20:58:06+07:00",
       "steps": [
+        "startup actual stock with expired schedule and saved workspace",
         "file import button and empty-template protection",
         "daily actions",
         "isolated what-if calculation",
@@ -91,8 +92,9 @@
     "exe": {
       "status": "PASS",
       "frozen": true,
-      "time": "2026-10-28T20:03:39+07:00",
+      "time": "2026-10-28T20:58:27+07:00",
       "steps": [
+        "startup actual stock with expired schedule and saved workspace",
         "file import button and empty-template protection",
         "daily actions",
         "isolated what-if calculation",
@@ -121,7 +123,7 @@
   "source_sha256": {
     "analytics_data.py": "608c69b64932b2d86b830553e9adb45876fdc24292cfdff4ae6973885043dbae",
     "analytics_view.py": "89f1259eb0b7b1260a18f85c7cdfabab0e188d489c4ce758f75fccd27589b028",
-    "app.py": "c20bfed99d96c6e6784044f5df1e73546073e7642d829aa7cc0eba8ee2b93451",
+    "app.py": "830e0ced554045cd9de4c469c034bc6edb2d746ea2fd5c8c5d6152b0bb2c3a3f",
     "assets/fonts/Inter.ttf": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031",
     "assets/fonts/OFL.txt": "5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57",
     "assets/icons/check.svg": "b40583b13a819d2d55aedf2fa20152f612a04f0304a652424325b8c663fb41f6",
@@ -130,19 +132,19 @@
     "assets/krona-wordmark.png": "0979f9aae1441a5b3181d293b661163775c2c349ab81c4534bed78e098b2440f",
     "build.py": "18181d315dafa34dce874b5df8c204b71a58bac34edac18f2c4dff851b52f173",
     "charts.py": "ca0e57eaed9a1e884cab712d64ea15b0c89a6eee0b82e3028acb562f653d0ff4",
-    "core.py": "4c533e116ca3fcacb7d52fa7b955c8d465479b0aeb4d7333233060b15d8e6ff7",
+    "core.py": "e57a25238eb417b29198f6891b0f2db9f6fce6f082139098e56496c2be4c4dc5",
     "customer_demo.py": "b5fcfa749a3ce0c04e139292c0c9cadf0dc1b06f3e215b533429d9ef18b22aed",
     "dalion_demo.py": "966d1fbbd65d39877e706cb48f5eb60fcfe4ffdf75bf881028313a7053aff694",
     "dalion_exchange.py": "25b18f94be7a1df8242f4c758ac6ffbc4175d9a472e563a20afe354f41558a4f",
     "demo_scenarios.py": "fb686d89905767f622cb71ebae88f62ad13cda675af58c188cc4a9e44095ecdb",
     "exchange_review.py": "4435aa8d600196002ffe9cd694baae00270a62c606c6270633942fd349765c9b",
     "interaction.py": "ba6dd5aeafc8aa4a89d6366f180299419bf9b0766080905abde895ffffd528ad",
-    "interaction_ui.py": "c5e084bb24d017ebbe34ac80fc30a31a9963cac646083b1958548fcd939c148e",
+    "interaction_ui.py": "3ea9c612a34cd49c92d374293d6feb7348d261f3ee930bc67315d81fbee0cc43",
     "navigation.py": "4e3e907e3ff4e98675bd4746316c5cef3ed7acad9af42b7f2e4816e8da78990f",
     "operations.py": "8177f9578974a993c7d6f3614408162236d2c0bfc43d7879c9ada023aaa9eeeb",
     "operations_ui.py": "bc874f64f94f961fa9223a342b7762b3110002e13c8ac7075a524a47e34e785c",
     "package_release.py": "aba8e0b2cc6e7978c5b4b799818383c8d3afb0f3d398279ea720320f64e611de",
-    "release_checks.py": "3fd2405f5b975db158345f084477993685f1cf64ceb3aff5b947fe00fb4fd968",
+    "release_checks.py": "ef8436e49b232f4691dfa35be8db4b65a45d9f777933b1ed7daeb3d2a1cea4f0",
     "requirements-build.txt": "41f5ca92a673d8177b0d11a1875d68aaa86a9677eaf7e01a6bce0acacfc185eb",
     "requirements.txt": "e9d8eeb2fb3db989705fcd3bfd83fac0e231f87fe819cb0189205795449a227e",
     "ui_theme.py": "68a4f9cc67315553408f1823e82650d2b9bb2c05c821fae2dc27179fa4d4ec47",
@@ -152,7 +154,7 @@
   "source_git_blob_sha256": {
     "analytics_data.py": "608c69b64932b2d86b830553e9adb45876fdc24292cfdff4ae6973885043dbae",
     "analytics_view.py": "89f1259eb0b7b1260a18f85c7cdfabab0e188d489c4ce758f75fccd27589b028",
-    "app.py": "3749c57f141fb128ea30a75f80248371d1dda84c0766ae9152d839d26a75d2fe",
+    "app.py": "5b2e8db08ad3ff793b6d7b02dc7169133801a1d1f29ac05149f8d2f292044846",
     "assets/fonts/Inter.ttf": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031",
     "assets/fonts/OFL.txt": "5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57",
     "assets/icons/check.svg": "b40583b13a819d2d55aedf2fa20152f612a04f0304a652424325b8c663fb41f6",
@@ -161,19 +163,19 @@
     "assets/krona-wordmark.png": "0979f9aae1441a5b3181d293b661163775c2c349ab81c4534bed78e098b2440f",
     "build.py": "18181d315dafa34dce874b5df8c204b71a58bac34edac18f2c4dff851b52f173",
     "charts.py": "ca0e57eaed9a1e884cab712d64ea15b0c89a6eee0b82e3028acb562f653d0ff4",
-    "core.py": "4c533e116ca3fcacb7d52fa7b955c8d465479b0aeb4d7333233060b15d8e6ff7",
+    "core.py": "e57a25238eb417b29198f6891b0f2db9f6fce6f082139098e56496c2be4c4dc5",
     "customer_demo.py": "b5fcfa749a3ce0c04e139292c0c9cadf0dc1b06f3e215b533429d9ef18b22aed",
     "dalion_demo.py": "966d1fbbd65d39877e706cb48f5eb60fcfe4ffdf75bf881028313a7053aff694",
     "dalion_exchange.py": "25b18f94be7a1df8242f4c758ac6ffbc4175d9a472e563a20afe354f41558a4f",
     "demo_scenarios.py": "fb686d89905767f622cb71ebae88f62ad13cda675af58c188cc4a9e44095ecdb",
     "exchange_review.py": "4435aa8d600196002ffe9cd694baae00270a62c606c6270633942fd349765c9b",
     "interaction.py": "ba6dd5aeafc8aa4a89d6366f180299419bf9b0766080905abde895ffffd528ad",
-    "interaction_ui.py": "c5e084bb24d017ebbe34ac80fc30a31a9963cac646083b1958548fcd939c148e",
+    "interaction_ui.py": "3ea9c612a34cd49c92d374293d6feb7348d261f3ee930bc67315d81fbee0cc43",
     "navigation.py": "4e3e907e3ff4e98675bd4746316c5cef3ed7acad9af42b7f2e4816e8da78990f",
     "operations.py": "8177f9578974a993c7d6f3614408162236d2c0bfc43d7879c9ada023aaa9eeeb",
     "operations_ui.py": "bc874f64f94f961fa9223a342b7762b3110002e13c8ac7075a524a47e34e785c",
     "package_release.py": "aba8e0b2cc6e7978c5b4b799818383c8d3afb0f3d398279ea720320f64e611de",
-    "release_checks.py": "3fd2405f5b975db158345f084477993685f1cf64ceb3aff5b947fe00fb4fd968",
+    "release_checks.py": "ef8436e49b232f4691dfa35be8db4b65a45d9f777933b1ed7daeb3d2a1cea4f0",
     "requirements-build.txt": "41f5ca92a673d8177b0d11a1875d68aaa86a9677eaf7e01a6bce0acacfc185eb",
     "requirements.txt": "e9d8eeb2fb3db989705fcd3bfd83fac0e231f87fe819cb0189205795449a227e",
     "ui_theme.py": "68a4f9cc67315553408f1823e82650d2b9bb2c05c821fae2dc27179fa4d4ec47",
@@ -195,6 +197,18 @@
     "Reject empty XLSX and empty points without database writes",
     "Keep existing CSV/XLSX files when exporting templates",
     "Restore populated synthetic examples",
-    "Exercise the import button in packaged smoke checks"
-  ]
+    "Exercise the import button in packaged smoke checks",
+    "Display actual stock without a valid replenishment schedule",
+    "Keep saved drafts and manual edits when restoring startup workspace",
+    "Keep unknown forecast values empty and require an explicit schedule correction"
+  ],
+  "startup_database_diagnostic": {
+    "stock_rows": 7,
+    "snapshot": false,
+    "route": "inventory",
+    "forecast_error": true,
+    "tables_unchanged": true,
+    "revision_unchanged": true,
+    "draft_unchanged": true
+  }
 }

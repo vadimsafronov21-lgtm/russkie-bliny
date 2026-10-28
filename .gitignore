@@ -32,3 +32,7 @@ qa/import-fix-build/
 qa/import-fix-source-smoke/
 qa/import-fix-exe-smoke/
 qa/import-fix-tests.xml
+qa/startup-fix-build/
+qa/startup-fix-source-smoke/
+qa/startup-fix-exe-smoke/
+qa/startup-fix-tests.xml

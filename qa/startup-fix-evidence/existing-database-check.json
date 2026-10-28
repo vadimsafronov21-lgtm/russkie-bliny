@@ -1,0 +1,9 @@
+{
+  "stock_rows": 7,
+  "snapshot": false,
+  "route": "inventory",
+  "forecast_error": true,
+  "tables_unchanged": true,
+  "revision_unchanged": true,
+  "draft_unchanged": true
+}

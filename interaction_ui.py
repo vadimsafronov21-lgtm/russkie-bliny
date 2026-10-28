@@ -108,8 +108,17 @@ class IngredientCard(QScrollArea):
         box.addStretch()
         self.ingredient=None
 
-    def set_row(self,payload,row,draft=None):
+    def set_row(self,payload,row,draft=None,error=None):
         self.ingredient=str(row['id']); unit=row['unit']; self.title.setText(row['name'])
+        if payload is None:
+            amount=lambda value:f'{value:.2f} {unit}' if value is not None else 'Нет данных'
+            self.summary.setText(f'Фактический остаток: {amount(row["stock"])}\n'
+                                 f'Пригодность подтверждена: {amount(row["usable_stock"])}\n'
+                                 f'Исключено по пригодности: {amount(row["blocked"])}\nПартий: {row["batch_count"]}')
+            self.chart.hide(); self.contributions.hide()
+            self.note.setText('Сверка: '+row['checked_at'][:19].replace('T',' ')+ '\n\n'+(error or 'Расчёт пополнения недоступен. Проверьте данные.'))
+            return
+        self.contributions.show()
         picked=(draft or {}).get('edits',{}).get(row['id'],{}).get('packs',row['packs'])
         self.summary.setText(f'Пригодный остаток: {row["stock"]:.2f} {unit}\nПотребность: {row["demand"]:.2f} {unit}\n'
                              f'Учтено поступлений: {row["incoming"]:.2f} {unit}\n'
@@ -234,9 +243,9 @@ class InteractionMixin:
         if getattr(self,'_stock_filling',False): return
         if not hasattr(self,'ingredient_card') or self.inventory_rail.currentWidget() is not self.ingredient_card: return
         index=self.stock_table.currentRow()
-        if not self.snapshot or not 0<=index<len(self.visible_stock): self.close_ingredient_card(); return
+        if not 0<=index<len(self.visible_stock): self.close_ingredient_card(); return
         draft=self.current if self.current and self.current.get('revision')==self.store.get('revision') and self.current.get('date')==self.calc_day().isoformat() else None
-        self.ingredient_card.set_row(self.snapshot,self.visible_stock[index],draft)
+        self.ingredient_card.set_row(self.snapshot,self.visible_stock[index],draft,self.calculation_error)
 
     def close_ingredient_card(self):
         self.inventory_rail.setCurrentIndex(0); self.inventory_rail.setFixedWidth(260)
@@ -261,7 +270,7 @@ class InteractionMixin:
                        dict(title='Что, если: сравнить сценарии',callback=self.open_what_if),
                        dict(title='Настройки точки',callback=lambda:self.navigate(4)),
                        dict(title='Крупный режим: переключить',callback=lambda:self.set_large_mode(not self.large_mode))])
-        for row in (self.snapshot or {}).get('rows',[]):
+        for row in self.snapshot['rows'] if self.snapshot else self.inventory_rows:
             result.append(dict(title='Карточка ингредиента: '+row['name'],callback=lambda key=row['id']:self.select_ingredient(key)))
             result.append(dict(title='Сверить: '+row['name'],callback=lambda key=row['id']:self.select_ingredient(key,True)))
         return result

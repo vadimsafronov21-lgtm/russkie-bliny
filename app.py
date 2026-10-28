@@ -19,7 +19,7 @@ from interaction_ui import InteractionMixin
 from operations_ui import OperationsMixin,ReviewImportDialog
 from exchange_review import prepare_file_import
 from analytics_view import AnalyticsPanel
-from core import Store,DataError,calculate,calculation_day,order_impact,now,export_order,write_templates,LABELS,SCHEMAS
+from core import Store,DataError,calculate,calculation_day,order_impact,now,export_order,write_templates,factual_inventory,LABELS,SCHEMAS
 from charts import StockProjectionChart
 from workflows import StockCorrectionDialog,QuantityDialog,OrderDetailsDialog,dialog_buttons,order_total,readable_change,ReasonPicker,remember_reason,ITEM_SETTING_REASONS
 
@@ -73,6 +73,8 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
         self.reload(); self.navigate(0)
         self.day_timer=QTimer(self); self.day_timer.setInterval(30000); self.day_timer.timeout.connect(self.check_day); self.day_timer.start()
         self.init_interaction()
+        if not self.snapshot and self.active_view=='order':
+            self.select_route('stock','inventory')
 
 
     def pid(self): return str(self.point.currentData() or '')
@@ -160,6 +162,7 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
     def reload(self):
         self.update_identity()
         tables=self.store.get('tables',{}); demo=self.store.get('demo',False)
+        self.inventory_rows=factual_inventory(tables,self.pid())
         self.banner.setText('Демонстрационные данные' if demo else 'Данные из файлов')
         self.banner.setToolTip('Синтетические продажи и условные настройки. Экономический эффект не доказан.' if demo else 'Проверьте полноту выгрузки, технологические карты и пригодность остатков.')
         self.network_changed()
@@ -181,9 +184,10 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
             rows=s['rows']; vals=[str(len(rows)),str(sum(r['packs']>0 for r in rows)),str(sum(r['surplus']>r['target'] for r in rows)),f'{delivery.day} {months[delivery.month-1]}']
             for l,v in zip(self.metrics,vals): l.setText(v)
         else:
-            self.fresh.setText('Расчёт недоступен.\n'+(self.calculation_error or 'Проверьте данные.'))
+            self.fresh.setText('Сохранённые остатки загружены.\nИмпорт: '+str(self.store.get('import_time','—'))[:19].replace('T',' ')+'\n\nРасчёт недоступен.\n'+(self.calculation_error or 'Проверьте данные.'))
             self.delivery_period.setText('Период не рассчитан')
             for l in self.metrics: l.setText('—')
+            self.metrics[0].setText(str(len(self.inventory_rows)))
         self.refresh_stock()
         saved=self.store.get('draft:'+self.pid())
         self.current=saved
@@ -209,11 +213,16 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
 
     def refresh_stock(self):
         if not hasattr(self,'stock_table'): return
-        rows=(self.snapshot or {}).get('rows',[]); q=self.search.text().lower(); mode=self.filter.currentIndex()
-        for i,tab in enumerate(self.stock_tabs): tab.setChecked(i==mode)
+        rows=self.snapshot['rows'] if self.snapshot else self.inventory_rows
+        q=self.search.text().lower(); mode=self.filter.currentIndex() if self.snapshot else 0
+        for i,tab in enumerate(self.stock_tabs):
+            tab.setChecked(i==mode); tab.setEnabled(i==0 or bool(self.snapshot))
         self.visible_stock=[r for r in rows if q in r['name'].lower() and (mode==0 or mode==1 and r['packs']>0 or mode==2 and r['surplus']>r['target'])]
         rendered=[]; colors=[]
         for r in self.visible_stock:
+            if not self.snapshot:
+                rendered.append([r['name'],f'{fmt(r["stock"],2)} {r["unit"]}' if r['stock'] is not None else 'Нет данных','—','—','Расчёт недоступен' if r['batch_count'] else 'Нет сверки'])
+                colors.append('#b8683c'); continue
             state='Дефицит до доставки' if r['shortage_before']>0 else 'Пополнить' if r['packs']>0 else 'Возможен излишек' if r['surplus']>r['target'] else 'Достаточно'
             rendered.append([r['name'],f'{fmt(r["stock"],2)} {r["unit"]}',fmt(r['stock']/r['portion_rate'],0) if r['portion_rate'] else 'разный расход',f'{fmt(r["demand"],2)} {r["unit"]}',state])
             colors.append('#b8683c' if state in ('Пополнить','Дефицит до доставки') else '#38715b')
@@ -225,6 +234,8 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
         i=self.stock_table.currentRow()
         if 0<=i<len(self.visible_stock): self.open_selected_card()
     def open_stock_chart(self):
+        if not self.snapshot:
+            self.notify(self.calculation_error or 'Расчёт запаса недоступен.',[('Проверить',self.resolve_problem)]); return
         i=self.stock_table.currentRow()
         if i<0 or i>=len(self.visible_stock): return
         ingredient=self.visible_stock[i]['id']; panel=self.analytics.stock_timeline

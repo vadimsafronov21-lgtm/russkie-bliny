@@ -6,7 +6,7 @@ import sys
 
 from PySide6.QtWidgets import QDialog
 
-from core import DataError,FileAdapter,now,write_templates
+from core import DataError,FileAdapter,Store,now,write_templates
 from dalion_demo import DalionDemoDialog
 from exchange_review import prepare_import
 from interaction_ui import CommandPalette,CompareOrdersDialog
@@ -18,6 +18,23 @@ def run_feature_checks(window,folder,application):
     if not window.store.get('demo'):
         raise DataError('Проверка сборки требует отдельной базы с синтетическими данными.')
     folder=Path(folder); store=window.store; steps=[]
+    startup_store=Store(folder/'startup-check'/'data.sqlite3'); startup_store.seed()
+    tables=startup_store.get('tables'); tables['schedules'][0]['next_delivery']='2020-01-01'
+    with startup_store.db:
+        startup_store.put('tables',tables)
+        startup_store.put('ui_workspace:central',dict(version=1,domain='stock',view='order',filter=1))
+    startup_window=window.__class__(startup_store)
+    try:
+        startup_window.show(); application.processEvents()
+        assert startup_window.snapshot is None and startup_window.stock_table.rowCount()==7
+        assert startup_window.active_view=='inventory'
+        startup_window.stock_table.selectRow(0); startup_window.open_selected_card()
+        assert '14.00' in startup_window.ingredient_card.summary.text()
+        assert startup_store.get('tables')==tables
+        startup_window.grab().save(str(folder/'startup-existing-data.png'))
+    finally:
+        startup_window.close(); startup_window.deleteLater(); application.processEvents(); startup_store.db.close()
+    steps.append('startup actual stock with expired schedule and saved workspace')
     blank=folder/'blank-template'; write_templates(blank)
     try:
         FileAdapter().read(blank/'import_template.xlsx')

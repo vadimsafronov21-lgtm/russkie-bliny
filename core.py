@@ -166,6 +166,22 @@ def validate(tables, existing=None):
     if errors: raise DataError('\n'.join(errors[:45]))
     return tables
 
+def factual_inventory(tables,point):
+    """Read stored physical quantities independently of a replenishment forecast."""
+    if str(point) not in {str(row['id']) for row in tables.get('points',[])}: return []
+    rows=[]
+    for item in tables.get('items',[]):
+        if item['kind']!='ingredient': continue
+        batches=[row for row in tables.get('batches',[]) if str(row['point'])==str(point) and str(row['ingredient'])==str(item['id'])]
+        usable=[row for row in batches if flag(row['usable'],'usable')]
+        rows.append(dict(id=str(item['id']),name=item['name'],unit=item['unit'],
+            stock=sum(float(row['qty']) for row in batches) if batches else None,
+            usable_stock=sum(float(row['qty']) for row in usable) if batches else None,
+            blocked=sum(float(row['qty']) for row in batches if not flag(row['usable'],'usable')),
+            checked_at=min((str(row['checked_at']) for row in batches),default='Нет сверки'),batch_count=len(batches)))
+    return rows
+
+
 class Store:
     def __init__(self,path):
         Path(path).parent.mkdir(parents=True,exist_ok=True)
