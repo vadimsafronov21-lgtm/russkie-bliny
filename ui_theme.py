@@ -5,7 +5,7 @@ from PySide6.QtCore import QByteArray,Qt,QRectF,QSize
 from PySide6.QtGui import QColor,QFont,QFontDatabase,QIcon,QPainter,QPixmap,QPalette
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (QTableWidget,QStyledItemDelegate,QStyleOptionViewItem,
-    QWidget,QVBoxLayout,QLabel,QAbstractItemView,QHeaderView,QStyle,QProxyStyle)
+    QWidget,QVBoxLayout,QLabel,QAbstractItemView,QHeaderView,QStyle,QProxyStyle,QToolButton,QSizePolicy)
 
 BURGUNDY='#A4002A'
 INK='#111E30'
@@ -139,6 +139,22 @@ QTabWidget::pane { border: 1px solid #E9E8ED; background: white; border-radius: 
 QTabBar::tab { background: transparent; color: #747786; padding: 12px 17px; border-bottom: 2px solid transparent; }
 QTabBar::tab:selected { color: #A4002A; border-bottom: 2px solid #A4002A; }
 QTabBar::tab:hover { background: #FCF3F4; }
+/* Fully style chart tabs so Fusion cannot paint its document-tab frame over them. */
+QTabWidget#chartModes::pane { border: none; background: transparent; }
+QTabBar#chartModeBar { background: transparent; }
+QTabBar#chartModeBar::tab { border: none; border-bottom: 2px solid transparent; background: #F6F6F8; margin: 0; }
+QTabBar#chartModeBar::tab:selected { color: #A4002A; border-bottom-color: #A4002A; }
+QTabBar#chartModeBar::tab:hover { background: #F9E8EB; color: #A4002A; }
+QTabBar#chartModeBar::tab:selected:hover { border-bottom-color: #A4002A; }
+QToolButton#disclosure { text-align: left; border: none; background: transparent; padding: 10px 6px; font-weight: 600; }
+QToolButton#disclosure:hover { background: #F9E8EB; color: #A4002A; }
+QToolButton#disclosure:focus { border: 1px solid #A4002A; border-radius: 6px; }
+QToolButton#headerTool { border: none; background: transparent; padding: 7px; border-radius: 6px; }
+QToolButton#headerTool:hover { background: #F9E8EB; }
+QToolButton#headerTool:focus { border: 1px solid #A4002A; }
+QMenu { background: white; border: 1px solid #DFE0E6; padding: 5px; }
+QMenu::item { padding: 9px 16px; }
+QMenu::item:selected { background: #F9E8EB; color: #A4002A; }
 QTableWidget { border: none; background: white; alternate-background-color: #FCFBFC; selection-background-color: #FCF3F4; selection-color: #111E30; outline: none; }
 QTableWidget::item { padding: 0 12px; border-bottom: 1px solid #F0EFF3; }
 QTableWidget::item:selected { background: #FCF3F4; color: #111E30; }
@@ -161,6 +177,20 @@ QCalendarWidget QWidget { background: white; color: #111E30; }
 QCalendarWidget QToolButton { color: #A4002A; background: white; }
 '''
 STYLE=STYLE.replace('__ICONS__',(ASSETS/'icons').as_posix())
+
+class Disclosure(QWidget):
+    """An explicit, keyboard-accessible place for secondary controls."""
+    def __init__(self,title,expanded=False,parent=None):
+        super().__init__(parent); layout=QVBoxLayout(self); layout.setContentsMargins(0,0,0,0); layout.setSpacing(4)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred,QSizePolicy.Policy.Maximum)
+        self.toggle=QToolButton(); self.toggle.setObjectName('disclosure'); self.toggle.setText(title)
+        self.toggle.setCheckable(True); self.toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.toggle.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Fixed)
+        self.body=QWidget(); self.box=QVBoxLayout(self.body); self.box.setContentsMargins(8,2,8,12); self.box.setSpacing(10)
+        layout.addWidget(self.toggle); layout.addWidget(self.body); self.toggle.toggled.connect(self.setExpanded); self.setExpanded(expanded)
+    def setExpanded(self,expanded):
+        self.toggle.setChecked(expanded); self.toggle.setArrowType(Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow)
+        self.body.setVisible(expanded); self.layout().activate(); self.updateGeometry()
 
 class StatusDelegate(QStyledItemDelegate):
     COLORS={

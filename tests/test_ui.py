@@ -59,7 +59,8 @@ def test_chart_periods_months_and_dish_drilldown(tmp_path,application):
     QTest.mouseClick(panel.period_buttons[0],Qt.MouseButton.LeftButton)
     assert panel.payload['length']==14 and len(panel.payload['actual'])==14
     selected=panel.payload['composition'][0]['id']
-    _,left=panel.mix_chart.geometry_parts(); top=(panel.mix_chart.height()-len(panel.mix_chart.rows)*35)/2
+    panel.chart_tabs.setCurrentIndex(2); application.processEvents()
+    _,left=panel.mix_chart.geometry_parts(); top,_,_=panel.mix_chart.legend_geometry()
     QTest.mouseClick(panel.mix_chart,Qt.MouseButton.LeftButton,pos=QPoint(int(left+20),int(top+12)))
     assert panel.dish_combo.currentData()==selected
     panel.mode_combo.setCurrentIndex(1)

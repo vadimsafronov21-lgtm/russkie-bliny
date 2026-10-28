@@ -180,78 +180,104 @@ class SalesChart(QWidget):
 class CoverageChart(QWidget):
     ingredientSelected=Signal(str)
     def __init__(self,parent=None):
-        super().__init__(parent); self.rows=[]; self.hover=None; self.setMinimumHeight(207); self.setMouseTracking(True)
+        super().__init__(parent); self.rows=[]; self.hover=None; self.setMinimumHeight(235); self.setMouseTracking(True)
     def set_data(self,rows): self.rows=rows; self.hover=None; self.update()
+    def chart_geometry(self):
+        top=12.; step=max(28.,(self.height()-48)/max(1,len(self.rows)))
+        left=min(285.,max(180.,self.width()*.23));right=self.width()-66.
+        return top,step,left,right
     def row_at(self,pos):
-        i=math.floor((pos.y()-16)/27)
-        return i if 0<=i<len(self.rows) else None
+        top,step,_,_=self.chart_geometry();i=math.floor((pos.y()-top)/step)
+        return i if 0<=i<len(self.rows) and 0<=pos.x()<=self.width() else None
     def mouseMoveEvent(self,event):
-        self.hover=self.row_at(event.position()); self.setCursor(Qt.CursorShape.PointingHandCursor if self.hover is not None else Qt.CursorShape.ArrowCursor)
+        previous=self.hover;self.hover=self.row_at(event.position()); self.setCursor(Qt.CursorShape.PointingHandCursor if self.hover is not None else Qt.CursorShape.ArrowCursor)
         if self.hover is not None:
             r=self.rows[self.hover]; QToolTip.showText(event.globalPosition().toPoint(),f'{r["name"]}\nСейчас: {num(r["effective"],2)} {r["unit"]}\nВ пути: {num(r["incoming"],2)} {r["unit"]}\nПотребность: {num(r["demand"],2)} {r["unit"]}\nДефицит до доставки: {num(r["shortage_before"],2)} {r["unit"]}\nНажмите для расчёта заявки',self)
-        self.update()
+        if previous!=self.hover:self.update()
     def mousePressEvent(self,event):
         i=self.row_at(event.position())
-        if i is not None: self.ingredientSelected.emit(str(self.rows[i]['id']))
+        if event.button()==Qt.MouseButton.LeftButton and i is not None:self.ingredientSelected.emit(str(self.rows[i]['id']))
     def leaveEvent(self,event): self.hover=None; QToolTip.hideText(); self.update()
     def paintEvent(self,event):
-        p=QPainter(self); p.setRenderHint(QPainter.RenderHint.Antialiasing); left=min(187,self.width()*.32); right=self.width()-54; width=right-left
-        p.setFont(font(11))
+        p=QPainter(self);p.setRenderHint(QPainter.RenderHint.Antialiasing)
         if not self.rows:
-            p.setPen(QColor('#92909D')); p.drawText(self.rect(),Qt.AlignmentFlag.AlignCenter|Qt.TextFlag.TextWordWrap,getattr(self,'empty_message','Расчёт покрытия недоступен')); return
+            p.setFont(font(13));p.setPen(QColor('#92909D'));p.drawText(self.rect(),Qt.AlignmentFlag.AlignCenter|Qt.TextFlag.TextWordWrap,getattr(self,'empty_message','Расчёт покрытия недоступен'));return
+        top,step,left,right=self.chart_geometry();width=max(1,right-left);thickness=min(22.,max(10.,step*.26))
+        text_size=15 if step>=60 and self.width()>850 else 13 if step>=40 else 11
         for i,r in enumerate(self.rows):
-            y=27+i*27
-            if self.hover==i: p.fillRect(QRectF(0,y-14,self.width(),27),QColor('#FCF4F6'))
-            p.setPen(QColor(INK)); p.drawText(QRectF(0,y-11,left-15,22),Qt.AlignmentFlag.AlignVCenter,p.fontMetrics().elidedText(r['name'],Qt.TextElideMode.ElideRight,int(left-17)))
-            p.setPen(Qt.PenStyle.NoPen); p.setBrush(QColor('#F1EFF4')); p.drawRoundedRect(QRectF(left,y-5,width,10),5,5)
-            if r['percent'] is None:
-                p.setPen(QColor('#9C96A3')); p.drawText(QRectF(right+9,y-9,45,20),Qt.AlignmentFlag.AlignRight,'—'); continue
-            current=min(150,r['effective']/r['demand']*100); incoming=min(150-current,r['incoming']/r['demand']*100)
-            p.setBrush(QColor(BURGUNDY)); p.drawRoundedRect(QRectF(left,y-5,width*current/150,10),5,5)
-            if incoming>0:
-                p.setBrush(QColor('#DF9DB3')); p.drawRoundedRect(QRectF(left+width*current/150,y-5,width*incoming/150,10),3,3)
-            p.setPen(QColor(INK)); p.drawText(QRectF(right+7,y-10,47,22),Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter,num(r['percent'])+'%')
-        x=left+width*100/150; p.setPen(QPen(QColor('#A9A2B0'),1,Qt.PenStyle.DashLine)); p.drawLine(QPointF(x,11),QPointF(x,27*len(self.rows)+15))
-        p.setFont(font(10)); p.setPen(QColor('#9B95A3')); p.drawText(QRectF(x-26,27*len(self.rows)+17,52,16),Qt.AlignmentFlag.AlignCenter,'100%')
+            y=top+(i+.5)*step
+            if self.hover==i:
+                p.setPen(Qt.PenStyle.NoPen);p.setBrush(QColor('#FCF4F6'));p.drawRoundedRect(QRectF(0,top+i*step,self.width(),step),8,8)
+            p.setFont(font(text_size,QFont.Weight.Medium));p.setPen(QColor(INK))
+            p.drawText(QRectF(6,y-(24 if step>=55 else 11),left-24,24),Qt.AlignmentFlag.AlignVCenter,p.fontMetrics().elidedText(r['name'],Qt.TextElideMode.ElideRight,int(left-24)))
+            if step>=55:
+                p.setFont(font(11));p.setPen(QColor('#888491'))
+                p.drawText(QRectF(6,y+3,left-24,20),Qt.AlignmentFlag.AlignVCenter,f'{num(r["effective"],1)} / {num(r["demand"],1)} {r["unit"]}')
+            p.setPen(Qt.PenStyle.NoPen);p.setBrush(QColor('#F1EFF4'));p.drawRoundedRect(QRectF(left,y-thickness/2,width,thickness),thickness/2,thickness/2)
+            if r['percent'] is not None:
+                current=min(150,r['effective']/r['demand']*100);incoming=min(150-current,r['incoming']/r['demand']*100)
+                p.setBrush(QColor(BURGUNDY));p.drawRoundedRect(QRectF(left,y-thickness/2,width*current/150,thickness),thickness/2,thickness/2)
+                if incoming>0:
+                    p.setBrush(QColor('#DF9DB3'));p.drawRoundedRect(QRectF(left+width*current/150,y-thickness/2,width*incoming/150,thickness),thickness/2,thickness/2)
+            p.setFont(font(text_size,QFont.Weight.Medium));p.setPen(QColor(INK))
+            p.drawText(QRectF(right+10,y-14,56,28),Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter,num(r['percent'])+'%' if r['percent'] is not None else '—')
+        x=left+width*100/150;bottom=top+step*len(self.rows)
+        p.setPen(QPen(QColor('#B7AEBC'),1,Qt.PenStyle.DashLine));p.drawLine(QPointF(x,top),QPointF(x,bottom))
+        p.setFont(font(11));p.setPen(QColor('#918799'));p.drawText(QRectF(x-45,bottom+3,90,22),Qt.AlignmentFlag.AlignCenter,'100%')
 
 class MixChart(QWidget):
     dishSelected=Signal(str)
     def __init__(self,parent=None):
-        super().__init__(parent); self.rows=[]; self.total=0; self.observed=0; self.hover=None; self.setMinimumHeight(207); self.setMouseTracking(True)
-    def set_data(self,rows,total,observed=0): self.rows=rows; self.total=total; self.observed=observed; self.hover=None; self.update()
+        super().__init__(parent);self.rows=[];self.total=0;self.observed=0;self.hover=None;self.setMinimumHeight(250);self.setMouseTracking(True)
+    def set_data(self,rows,total,observed=0):self.rows=rows;self.total=total;self.observed=observed;self.hover=None;self.update()
     def geometry_parts(self):
-        diameter=min(161,max(112,self.width()*.38)); return QRectF(1,(self.height()-diameter)/2,diameter,diameter),diameter+24
+        diameter=max(112.,min(460.,self.height()-34.,self.width()*.40))
+        gap=min(90.,max(24.,self.width()*.055));legend_width=min(610.,max(140.,self.width()-diameter-gap-20))
+        group_width=diameter+gap+legend_width;start=max(8.,(self.width()-group_width)/2)
+        return QRectF(start,(self.height()-diameter)/2,diameter,diameter),start+diameter+gap
+    def legend_geometry(self):
+        rect,left=self.geometry_parts();width=min(610.,self.width()-left-8.)
+        step=max(34.,min(78.,self.height()*.78/max(1,len(self.rows))))
+        return (self.height()-step*len(self.rows))/2,step,left+width
+    def ring_width(self):return max(17.,min(46.,self.geometry_parts()[0].width()*.105))
     def row_at(self,pos):
-        rect,left=self.geometry_parts()
-        if pos.x()>=left:
-            i=math.floor((pos.y()-(self.height()-len(self.rows)*35)/2)/35)
-            return i if 0<=i<len(self.rows) else None
-        dx=pos.x()-rect.center().x(); dy=pos.y()-rect.center().y(); radius=math.hypot(dx,dy)
-        if self.total and rect.width()/2-24<radius<rect.width()/2+10:
-            angle=(math.degrees(math.atan2(dy,dx))+90)%360; acc=0
+        rect,left=self.geometry_parts();top,step,right=self.legend_geometry()
+        if left<=pos.x()<=right:
+            i=math.floor((pos.y()-top)/step);return i if 0<=i<len(self.rows) else None
+        dx=pos.x()-rect.center().x();dy=pos.y()-rect.center().y();radius=math.hypot(dx,dy);stroke=self.ring_width()
+        if self.total and rect.width()/2-stroke-7<=radius<=rect.width()/2:
+            angle=(math.degrees(math.atan2(dy,dx))+90)%360;acc=0
             for i,r in enumerate(self.rows):
                 acc+=r['value']/self.total*360
-                if angle<=acc: return i
+                if angle<=acc:return i
         return None
     def mouseMoveEvent(self,event):
-        self.hover=self.row_at(event.position()); self.setCursor(Qt.CursorShape.PointingHandCursor if self.hover is not None and self.rows[self.hover]['id'] is not None else Qt.CursorShape.ArrowCursor)
+        previous=self.hover;self.hover=self.row_at(event.position());self.setCursor(Qt.CursorShape.PointingHandCursor if self.hover is not None and self.rows[self.hover]['id'] is not None else Qt.CursorShape.ArrowCursor)
         if self.hover is not None:
-            r=self.rows[self.hover]; QToolTip.showText(event.globalPosition().toPoint(),f'{r["name"]}\n{num(r["value"])} порций · {num(r["value"]/self.total*100,1)}%\nНажмите, чтобы посмотреть динамику',self)
-        self.update()
+            r=self.rows[self.hover];QToolTip.showText(event.globalPosition().toPoint(),f'{r["name"]}\n{num(r["value"])} порций · {num(r["value"]/self.total*100,1)}%\nНажмите, чтобы посмотреть динамику',self)
+        if previous!=self.hover:self.update()
     def mousePressEvent(self,event):
         i=self.row_at(event.position())
-        if i is not None and self.rows[i]['id'] is not None: self.dishSelected.emit(str(self.rows[i]['id']))
-    def leaveEvent(self,event): self.hover=None; QToolTip.hideText(); self.update()
+        if event.button()==Qt.MouseButton.LeftButton and i is not None and self.rows[i]['id'] is not None:self.dishSelected.emit(str(self.rows[i]['id']))
+    def leaveEvent(self,event):self.hover=None;QToolTip.hideText();self.update()
     def paintEvent(self,event):
-        p=QPainter(self); p.setRenderHint(QPainter.RenderHint.Antialiasing); rect,left=self.geometry_parts()
+        p=QPainter(self);p.setRenderHint(QPainter.RenderHint.Antialiasing);rect,left=self.geometry_parts();stroke=self.ring_width()
+        arc=rect.adjusted(stroke/2+4,stroke/2+4,-stroke/2-4,-stroke/2-4)
         if not self.total:
-            p.setPen(QPen(QColor('#F1EDF2'),18)); p.drawEllipse(rect.adjusted(12,12,-12,-12)); p.setFont(font(12)); p.setPen(QColor('#92909D')); p.drawText(rect,Qt.AlignmentFlag.AlignCenter,'Нет продаж' if self.observed else 'Нет данных'); return
+            p.setPen(QPen(QColor('#F1EDF2'),stroke));p.drawEllipse(arc);p.setFont(font(14));p.setPen(QColor('#92909D'));p.drawText(rect,Qt.AlignmentFlag.AlignCenter,'Нет продаж' if self.observed else 'Нет данных');return
         angle=90
         for i,r in enumerate(self.rows):
-            span=r['value']/self.total*360; pen=QPen(QColor(COLORS[i]),22 if self.hover==i else 17); pen.setCapStyle(Qt.PenCapStyle.FlatCap); p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush); p.drawArc(rect.adjusted(13,13,-13,-13),int(angle*16),int(-(span-2 if span>3 else span)*16)); angle-=span
-        p.setPen(QColor(INK)); p.setFont(font(25,QFont.Weight.DemiBold)); p.drawText(rect.adjusted(0,-9,0,-9),Qt.AlignmentFlag.AlignCenter,num(self.total)); p.setFont(font(10)); p.setPen(QColor('#97909D')); p.drawText(rect.adjusted(0,39,0,0),Qt.AlignmentFlag.AlignCenter,'порций')
-        top=(self.height()-len(self.rows)*35)/2
+            span=r['value']/self.total*360;pen=QPen(QColor(COLORS[i%len(COLORS)]),stroke+(4 if self.hover==i else 0));pen.setCapStyle(Qt.PenCapStyle.FlatCap)
+            p.setPen(pen);p.setBrush(Qt.BrushStyle.NoBrush);p.drawArc(arc,int(angle*16),int(-(span-2 if span>3 else span)*16));angle-=span
+        total_size=max(24,min(48,int(rect.width()*.115)));p.setFont(font(total_size,QFont.Weight.DemiBold));p.setPen(QColor(INK))
+        p.drawText(rect.adjusted(0,-12,0,-12),Qt.AlignmentFlag.AlignCenter,num(self.total));p.setFont(font(12));p.setPen(QColor('#97909D'));p.drawText(rect.adjusted(0,total_size+12,0,0),Qt.AlignmentFlag.AlignCenter,'порций')
+        top,step,right=self.legend_geometry();size=15 if self.width()>850 else 12
         for i,r in enumerate(self.rows):
-            y=top+i*35; p.setBrush(QColor(COLORS[i])); p.setPen(Qt.PenStyle.NoPen); p.drawEllipse(QPointF(left+3,y+12),3.5,3.5); p.setFont(font(10)); p.setPen(QColor(INK))
-            name=p.fontMetrics().elidedText(r['name'],Qt.TextElideMode.ElideRight,max(20,int(self.width()-left-49)))
-            p.drawText(QPointF(left+15,y+15),name); p.setFont(font(10,QFont.Weight.Medium)); p.drawText(QRectF(self.width()-39,y+3,39,20),Qt.AlignmentFlag.AlignRight,num(r['value']/self.total*100)+'%')
+            y=top+i*step;row_rect=QRectF(left-10,y,max(1,right-left+10),step)
+            if self.hover==i:p.setPen(Qt.PenStyle.NoPen);p.setBrush(QColor('#FCF4F6'));p.drawRoundedRect(row_rect,8,8)
+            center=y+step/2;p.setBrush(QColor(COLORS[i%len(COLORS)]));p.setPen(Qt.PenStyle.NoPen);p.drawEllipse(QPointF(left+4,center-7 if step>=50 else center),4.5,4.5)
+            p.setFont(font(size,QFont.Weight.Medium));p.setPen(QColor(INK));name=p.fontMetrics().elidedText(r['name'],Qt.TextElideMode.ElideRight,max(20,int(right-left-100)))
+            p.drawText(QRectF(left+21,center-(23 if step>=50 else 12),max(20,right-left-100),24),Qt.AlignmentFlag.AlignVCenter,name)
+            if step>=50:
+                p.setFont(font(12));p.setPen(QColor('#928B98'));p.drawText(QRectF(left+21,center+4,max(20,right-left-100),22),Qt.AlignmentFlag.AlignVCenter,num(r['value'])+' порций')
+            p.setFont(font(size+2,QFont.Weight.DemiBold));p.setPen(QColor(INK));p.drawText(QRectF(right-72,center-15,72,30),Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter,num(r['value']/self.total*100)+'%')

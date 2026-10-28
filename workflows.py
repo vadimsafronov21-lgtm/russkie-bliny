@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (QDialog,QVBoxLayout,QHBoxLayout,QFormLayout,QLabe
 from core import DataError,order_impact
 from charts import StockProjectionChart,num
 from ui_theme import DataTable
+from ui_motion import MotionLabel
 
 ORDER_REASONS=['Ожидается большой заказ','Ожидается повышенный спрос','Ожидается снижение спроса',
     'Есть дополнительный запас','Планируется перемещение с другой точки','Изменился график поставок',
@@ -33,7 +34,7 @@ def remember_reason(store,kind,reason):
 
 
 def caption(value,kind='subtitle'):
-    widget=QLabel(value); widget.setObjectName(kind); widget.setWordWrap(True); return widget
+    widget=MotionLabel(value) if kind in ('title','chartTitle') else QLabel(value); widget.setObjectName(kind); widget.setWordWrap(True); return widget
 
 
 def dialog_buttons(dialog,layout,save):
@@ -160,9 +161,9 @@ class StockTimelinePanel(QFrame):
         self.setObjectName('chartCard'); box=QVBoxLayout(self); box.setContentsMargins(23,20,23,18); box.setSpacing(12)
         top=QHBoxLayout(); top.addWidget(caption('Запас по дням','chartTitle')); top.addStretch()
         self.ingredient=QComboBox(); self.ingredient.setMinimumWidth(240); self.ingredient.currentIndexChanged.connect(self.refresh); top.addWidget(self.ingredient); box.addLayout(top)
-        self.summary=caption('','section'); box.addWidget(self.summary)
-        self.chart=StockProjectionChart(); self.chart.setMinimumHeight(340); box.addWidget(self.chart)
-        self.note=caption(''); box.addWidget(self.note)
+        self.summary=caption('','section'); self.summary.setWordWrap(True); box.addWidget(self.summary)
+        self.chart=StockProjectionChart(); self.chart.setMinimumHeight(340); box.addWidget(self.chart,1)
+        self.note=caption(''); self.note.setWordWrap(True); box.addWidget(self.note)
     def set_snapshot(self,snapshot,draft=None,error=None):
         self.snapshot=snapshot; self.draft=draft; self.error=error
         selected=self.ingredient.currentData(); self.ingredient.blockSignals(True); self.ingredient.clear()

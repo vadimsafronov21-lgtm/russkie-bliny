@@ -2,14 +2,15 @@
 from datetime import date,timedelta
 from PySide6.QtCore import Qt,Signal
 from PySide6.QtWidgets import (QWidget,QFrame,QLabel,QPushButton,QComboBox,QVBoxLayout,QHBoxLayout,
-    QScrollArea,QDialog,QApplication)
+    QScrollArea,QDialog,QApplication,QTabWidget)
 from charts import SalesChart,CoverageChart,MixChart,num
 from analytics_data import make_analytics
 from ui_theme import svg_icon,BURGUNDY
 from workflows import StockTimelinePanel
+from ui_motion import MotionButton,MotionTabBar,MotionLabel,reveal_heading
 
 def text(value,kind='subtitle'):
-    widget=QLabel(value); widget.setObjectName(kind); return widget
+    widget=MotionLabel(value) if kind=='chartTitle' else QLabel(value); widget.setObjectName(kind); return widget
 
 def card():
     widget=QFrame(); widget.setObjectName('chartCard'); layout=QVBoxLayout(widget); layout.setContentsMargins(23,20,23,18); layout.setSpacing(10)
@@ -27,37 +28,57 @@ class AnalyticsPanel(QWidget):
         layout=QVBoxLayout(self); layout.setContentsMargins(0,0,0,0)
         scroll=QScrollArea(); scroll.setWidgetResizable(True); scroll.setFrameShape(QFrame.Shape.NoFrame); scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff); layout.addWidget(scroll)
         body=QWidget(); body.setMinimumWidth(850); content=QVBoxLayout(body); content.setContentsMargins(1,0,8,7); content.setSpacing(17); scroll.setWidget(body)
-        metrics=QHBoxLayout(); metrics.setSpacing(25); self.metric_values=[]; self.metric_labels=[]; self.metric_hints=[]
+        self.dish_metrics=QWidget(); metrics=QHBoxLayout(self.dish_metrics); metrics.setContentsMargins(0,0,0,0); metrics.setSpacing(25); self.metric_values=[]; self.metric_labels=[]; self.metric_hints=[]
         for name in ['Продано за период','Среднее за день','Самый активный день','Спрос к пополнению']:
             slot=QVBoxLayout(); slot.setSpacing(3); caption=text(name); value=text('—','chartMetric'); hint=text('','metricHint')
             slot.addWidget(caption); slot.addWidget(value); slot.addWidget(hint); metrics.addLayout(slot,1); self.metric_labels.append(caption); self.metric_values.append(value); self.metric_hints.append(hint)
-        self.scope=text('','section'); content.addWidget(self.scope); content.addLayout(metrics)
+        self.scope=text('','section'); content.addWidget(self.scope); content.addWidget(self.dish_metrics)
+        self.chart_tabs=QTabWidget(); self.chart_tabs.setTabBar(MotionTabBar()); self.chart_tabs.setObjectName('chartModes'); self.chart_tabs.setDocumentMode(True)
+        self.chart_tabs.tabBar().setObjectName('chartModeBar'); self.chart_tabs.tabBar().setDrawBase(False)
+        content.addWidget(self.chart_tabs,1)
         hero,hero_box=card(); heading=QHBoxLayout(); titlebox=QVBoxLayout(); titlebox.setSpacing(4); self.hero_title=text('Продажи и прогноз','chartTitle'); self.date_range=text('Закрытые смены'); titlebox.addWidget(self.hero_title); titlebox.addWidget(self.date_range); heading.addLayout(titlebox,1)
         self.dish_combo=QComboBox(); self.dish_combo.setMinimumWidth(230); self.dish_combo.currentIndexChanged.connect(self.refresh); heading.addWidget(self.dish_combo)
         self.mode_combo=QComboBox(); self.mode_combo.addItems(['Динамика и прогноз','Сравнение месяцев']); self.mode_combo.setMinimumWidth(202); self.mode_combo.currentIndexChanged.connect(self.refresh); heading.addWidget(self.mode_combo)
         expand=QPushButton(); expand.setObjectName('quiet'); expand.setIcon(svg_icon('expand',BURGUNDY)); expand.setFixedWidth(32); expand.setToolTip('Открыть большой график'); expand.setAccessibleName('Развернуть график'); expand.setCursor(Qt.CursorShape.PointingHandCursor); expand.clicked.connect(self.fullscreen); heading.addWidget(expand); hero_box.addLayout(heading)
-        tools=QHBoxLayout(); tools.setSpacing(6); self.period_buttons=[]
+        self.period_tools=QWidget(); tools=QHBoxLayout(self.period_tools); tools.setContentsMargins(0,0,0,0); tools.setSpacing(6); self.period_buttons=[]
         for days in (14,30,90):
-            button=QPushButton(f'{days} дней'); button.setObjectName('period'); button.setCheckable(True); button.setCursor(Qt.CursorShape.PointingHandCursor); button.clicked.connect(lambda checked=False,n=days:self.set_period(n)); self.period_buttons.append(button); tools.addWidget(button)
-        tools.addStretch(); tools.addWidget(text('Наведите на линию — увидите значения','metricHint')); hero_box.addLayout(tools)
+            button=MotionButton(f'{days} дней','period'); button.setObjectName('period'); button.clicked.connect(lambda checked=False,n=days:self.set_period(n)); self.period_buttons.append(button); tools.addWidget(button)
+        tools.addStretch(); self.period_hint=text('Наведите на линию — увидите значения','metricHint'); tools.addWidget(self.period_hint); hero_box.addWidget(self.period_tools)
         self.sales_chart=SalesChart(); hero_box.addWidget(self.sales_chart,1)
         self.history_hint=text(''); self.history_hint.setWordWrap(True); hero_box.addWidget(self.history_hint)
-        content.addWidget(hero,5)
-        bottom=QHBoxLayout(); bottom.setSpacing(18)
+        self.chart_tabs.addTab(hero,'Продажи и прогноз')
         coverage,coverage_box=card(); heading=QHBoxLayout(); heading.addWidget(text('Запас и потребность','chartTitle')); heading.addStretch(); self.coverage_period=text(''); heading.addWidget(self.coverage_period); coverage_box.addLayout(heading)
         coverage_box.addWidget(text('Сколько потребности покрывают остаток и поставки в пути'))
         self.coverage_chart=CoverageChart(); self.coverage_chart.setMinimumHeight(235); self.coverage_chart.ingredientSelected.connect(self.ingredientSelected); coverage_box.addWidget(self.coverage_chart,1)
         legend=QHBoxLayout(); legend.addWidget(text('● Сейчас','legendStock')); legend.addWidget(text('● В пути','legendIncoming')); legend.addStretch(); legend.addWidget(text('Шкала до 150%','metricHint')); coverage_box.addLayout(legend)
-        self.coverage_hint=text('Нажмите на ингредиент, чтобы открыть расчёт','metricHint'); self.coverage_hint.setWordWrap(True); coverage_box.addWidget(self.coverage_hint); bottom.addWidget(coverage,6)
-        mix,mix_box=card(); mix_box.addWidget(text('Что выбирают гости','chartTitle')); self.mix_period=text('Доли блюд в подтверждённых продажах'); mix_box.addWidget(self.mix_period)
+        self.coverage_hint=text('Нажмите на ингредиент, чтобы открыть расчёт','metricHint'); self.coverage_hint.setWordWrap(True); coverage_box.addWidget(self.coverage_hint); self.chart_tabs.addTab(coverage,'Покрытие запаса')
+        mix,mix_box=card(); self.mix_box=mix_box; self.hero_box=hero_box
+        mix_box.addWidget(text('Что выбирают гости','chartTitle')); self.mix_period=text('Доли блюд в подтверждённых продажах'); mix_box.addWidget(self.mix_period)
         self.mix_chart=MixChart(); self.mix_chart.dishSelected.connect(self.select_dish); mix_box.addWidget(self.mix_chart,1)
-        hint=text('Нажмите на блюдо, чтобы посмотреть его динамику','metricHint'); hint.setWordWrap(True); mix_box.addWidget(hint); bottom.addWidget(mix,4)
-        content.addLayout(bottom,4)
-        self.stock_timeline=StockTimelinePanel(); content.addWidget(self.stock_timeline)
+        hint=text('Нажмите на блюдо, чтобы посмотреть его динамику','metricHint'); hint.setWordWrap(True); mix_box.addWidget(hint); self.chart_tabs.addTab(mix,'Доли блюд')
+        self.stock_timeline=StockTimelinePanel(); self.chart_tabs.addTab(self.stock_timeline,'Запас по дням')
+        self.chart_tabs.currentChanged.connect(self.update_chart_context)
+        self.chart_tabs.currentChanged.connect(lambda:self.animate_chart_heading())
+        self.mode_combo.currentIndexChanged.connect(self.update_chart_context)
+    def update_chart_context(self,*args):
+        monthly=self.mode_combo.currentIndex()==1
+        for index in range(1,4): self.chart_tabs.setTabVisible(index,not monthly)
+        if monthly and self.chart_tabs.currentIndex()!=0: self.chart_tabs.setCurrentIndex(0)
+        index=self.chart_tabs.currentIndex(); sales=index==0
+        self.scope.setVisible(sales); self.dish_metrics.setVisible(sales)
+        if index in (0,2):
+            target=self.hero_box if sales else self.mix_box
+            if target.indexOf(self.period_tools)<0: target.insertWidget(1,self.period_tools)
+        self.period_tools.setVisible(not monthly and index in (0,2))
+        self.period_hint.setVisible(sales)
+    def animate_chart_heading(self):
+        current=self.chart_tabs.currentWidget()
+        if current is not None: reveal_heading(current.findChild(QLabel,'chartTitle'))
     def set_period(self,days): self.days=days; self.refresh()
     def select_dish(self,id):
         index=self.dish_combo.findData(id)
-        if index>=0: self.dish_combo.setCurrentIndex(index)
+        if index>=0:
+            self.dish_combo.setCurrentIndex(index); self.chart_tabs.setCurrentIndex(0)
     def set_data(self,tables,point,day,snapshot,error=None,draft=None):
         self.tables=tables; self.point=point; self.day=day; self.snapshot=snapshot; self.error=error
         self.stock_timeline.set_snapshot(snapshot,draft,error); self.refresh()
@@ -68,6 +89,7 @@ class AnalyticsPanel(QWidget):
         for index,button in enumerate(self.period_buttons): button.setChecked((14,30,90)[index]==self.days); button.setEnabled(not monthly)
         self.payload=make_analytics(self.tables,self.point,str(self.dish_combo.currentData()),self.day,self.days,self.snapshot,monthly)
         p=self.payload; start=date.fromisoformat(p['start']).strftime('%d.%m'); end=date.fromisoformat(p['end']).strftime('%d.%m')
+        self.update_chart_context()
         self.hero_title.setText('Месяцы день за днём' if monthly else 'Продажи и прогноз')
         last_actual=(date.fromisoformat(p['end'])-timedelta(days=1)).strftime('%d.%m')
         forecast_end=' · прогноз до '+date.fromisoformat(p['future'][-1]['date']).strftime('%d.%m') if p['future'] else ''
@@ -85,8 +107,8 @@ class AnalyticsPanel(QWidget):
         self.metric_values[3].setText('≈ '+num(forecast['expected']) if forecast else '—')
         self.metric_hints[3].setText(f'Ориентир {num(forecast["low"])}–{num(forecast["high"])} порций' if forecast else 'Проверьте данные и график поставок')
         self.sales_chart.set_data(p,monthly); self.mix_chart.set_data(p['composition'],p['composition_total'],p['composition_observed']); self.coverage_chart.set_data(p['coverage'])
-        self.coverage_period.setText('На '+days_text(days) if days else '')
-        self.mix_period.setText('Доли продаж за три завершённых месяца' if monthly else f'Доли продаж за последние {self.days} дней')
+        self.coverage_period.setText(f'{self.snapshot["date"]} — {self.snapshot["end"]} · '+days_text(days) if days else 'Период покрытия не рассчитан')
+        self.mix_period.setText(f'{num(p["composition_total"])} порций всех блюд · {start} — {last_actual} · {self.days} дней')
         missing=p['length']-p['observed']; stockout=sum(v['available'] is False for v in p['actual'])
         hints=[]
         last=p['last_closed']

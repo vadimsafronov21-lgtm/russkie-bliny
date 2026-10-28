@@ -6,14 +6,15 @@ import re
 from pathlib import Path
 
 from PySide6.QtCore import QByteArray,QEvent,Qt,QTimer,QUrl
-from PySide6.QtGui import QDesktopServices,QKeySequence,QShortcut
+from PySide6.QtGui import QAction,QDesktopServices,QKeySequence,QShortcut
 from PySide6.QtWidgets import (QApplication,QComboBox,QDialog,QFrame,QHBoxLayout,QLabel,QLineEdit,
-    QListWidget,QListWidgetItem,QPushButton,QScrollArea,QSizePolicy,QTabWidget,QTableWidget,QVBoxLayout,QWidget)
+    QListWidget,QListWidgetItem,QPushButton,QScrollArea,QSizePolicy,QTabWidget,QTableWidget,QVBoxLayout,QWidget,QToolButton,QMenu)
 
 from charts import StockProjectionChart
 from core import DataError,order_impact
 from interaction import compare_orders,save_order_edit,undo_order_edit
-from ui_theme import STYLE,DataTable
+from ui_theme import STYLE,DataTable,svg_icon,BURGUNDY
+from ui_motion import finish_motion,MotionTabBar
 
 
 def label(value,role=None):
@@ -34,19 +35,25 @@ def fill(table,rows):
 class NotificationBar(QFrame):
     def __init__(self,parent=None):
         super().__init__(parent); self.setObjectName('rail'); self.box=QHBoxLayout(self)
+        self.box.setContentsMargins(10,5,10,5); self.history=[]; self.persistent=False
         self.caption=label(''); self.caption.setSizePolicy(QSizePolicy.Policy.Ignored,QSizePolicy.Policy.Preferred)
         self.box.addWidget(self.caption,1); self.actions=[]
         self.close_button=button('×',self.hide); self.close_button.setAccessibleName('Закрыть уведомление'); self.close_button.setFixedWidth(42)
         self.box.addWidget(self.close_button)
         self.timer=QTimer(self); self.timer.setSingleShot(True); self.timer.timeout.connect(self.hide); self.hide()
 
-    def display(self,message,actions=()):
+    def dismiss_success(self):
+        if not self.persistent: self.timer.stop(); self.hide()
+
+    def display(self,message,actions=(),persistent=False):
+        self.persistent=persistent; self.history.append((message,tuple(actions))); self.history=self.history[-30:]
         self.caption.setText(message); self.caption.setToolTip(message)
         for widget in self.actions: self.box.removeWidget(widget); widget.hide(); widget.deleteLater()
         self.actions=[]
         for title,callback in actions:
-            widget=button(title,callback); self.box.insertWidget(self.box.count()-1,widget); self.actions.append(widget)
-        self.show(); self.timer.start(12000)
+            widget=button(title,callback); widget.setObjectName('quiet'); self.box.insertWidget(self.box.count()-1,widget); self.actions.append(widget)
+        self.show(); self.timer.stop()
+        if not persistent: self.timer.start(6000)
 
 
 class CommandPalette(QDialog):
@@ -146,7 +153,7 @@ class CompareOrdersDialog(QDialog):
             title=f'№{order_id} · {order["created"][:16].replace("T"," ")} · поставка {order["payload"]["arrival"]}'
             self.before.addItem(title,order_id); self.after.addItem(title,order_id)
         self.summary=label(''); box.addWidget(self.summary)
-        tabs=QTabWidget(); box.addWidget(tabs,1)
+        tabs=QTabWidget(); tabs.setTabBar(MotionTabBar(background='#FFFFFF')); box.addWidget(tabs,1)
         self.quantities=DataTable(['Ингредиент','Раньше','Позже','Разница количества','Разница суммы, ₽']); tabs.addTab(self.quantities,'Количество и стоимость')
         self.reasons=DataTable(['Ингредиент','Причина раньше','Причина позже']); tabs.addTab(self.reasons,'Причины правок')
         box.addWidget(label('Сравниваются сохранённые заявки одной точки и одного типа данных. '
@@ -177,17 +184,27 @@ class InteractionMixin:
         self._interaction_ready=False; self._ui_closing=False
         self.workspace_timer=QTimer(self); self.workspace_timer.setSingleShot(True); self.workspace_timer.timeout.connect(self.save_workspace)
         area=self.status.parentWidget().layout()
-        self.notifications=NotificationBar(); area.insertWidget(area.indexOf(self.status),self.notifications)
-        area.removeWidget(self.breadcrumb); tools=QHBoxLayout(); tools.addWidget(self.breadcrumb,1)
-        self.commands_button=button('Действия · Ctrl+Shift+P',self.open_commands); tools.addWidget(self.commands_button)
-        self.large_button=QPushButton('Крупный режим'); self.large_button.setCheckable(True); self.large_button.toggled.connect(self.set_large_mode); tools.addWidget(self.large_button)
-        area.insertLayout(0,tools)
-        self.ingredient_card=IngredientCard(); self.inventory_rail.addWidget(self.ingredient_card)
+        self.notifications=NotificationBar(); area.addWidget(self.notifications)
+        self.commands_button=QToolButton(); self.commands_button.setObjectName('headerTool'); self.commands_button.setIcon(svg_icon('search',BURGUNDY))
+        self.commands_button.setToolTip('Поиск действий · Ctrl+Shift+P'); self.commands_button.setAccessibleName('Поиск действий'); self.commands_button.clicked.connect(self.open_commands)
+        self.header_layout.insertWidget(self.header_layout.count()-1,self.commands_button)
+        self.profile_button=QToolButton(); self.profile_button.setObjectName('headerTool'); self.profile_button.setText('⋯'); self.profile_button.setAccessibleName('Профиль и помощь')
+        self.profile_button.setToolTip('Профиль, доступность и помощь'); self.profile_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.profile_menu=QMenu(self.profile_button); self.profile_button.setMenu(self.profile_menu); self.header_layout.addWidget(self.profile_button)
+        self.large_button=QAction('Крупный режим',self); self.large_button.setCheckable(True); self.large_button.toggled.connect(self.set_large_mode); self.profile_menu.addAction(self.large_button)
+        self.motion_button=QAction('Плавные переходы',self); self.motion_button.setCheckable(True); self.motion_button.setChecked(bool(self.property('motionEnabled')))
+        self.motion_button.toggled.connect(self.set_motion_enabled); self.profile_menu.addAction(self.motion_button)
+        self.profile_menu.addAction('Настройки точки',lambda:self.navigate(4))
+        self.profile_menu.addAction('Уведомления',self.open_notifications)
+        help_menu=self.profile_menu.addMenu('Помощь'); help_menu.addAction('Демонстрации обмена',self.open_dalion_demo)
+        help_menu.addAction('Подготовить демо-файл',lambda:self.templates(True))
+        self.ingredient_dialog=QDialog(self); self.ingredient_dialog.setWindowTitle('Подробности и график запаса'); self.ingredient_dialog.resize(920,790)
+        self.ingredient_dialog.setMinimumSize(680,580)
+        details=QVBoxLayout(self.ingredient_dialog); details.setContentsMargins(12,12,12,12)
+        self.ingredient_card=IngredientCard(); details.addWidget(self.ingredient_card)
         self.ingredient_card.close_button.clicked.connect(self.close_ingredient_card)
-        self.stock_table.cellClicked.connect(lambda row,column:self.open_selected_card())
         self.stock_table.currentCellChanged.connect(lambda *args:self.refresh_ingredient_card())
-        self.page_actions[1].addWidget(button('Отменить правку',self.undo_last_edit))
-        self.undo_button=self.page_actions[1].itemAt(self.page_actions[1].count()-1).widget()
+        self.undo_button=button('Отменить правку',self.undo_last_edit); self.order_edit_actions.insertWidget(1,self.undo_button)
         self.page_actions[3].addWidget(button('Сравнить заявки',self.open_comparison))
         shortcut=QShortcut(QKeySequence('Ctrl+Shift+P'),self); shortcut.activated.connect(self.open_commands); self.shortcuts.append(shortcut)
         for signal in (self.search.textChanged,self.filter.currentIndexChanged,self.chart_dish.currentIndexChanged,self.history_search.textChanged):
@@ -197,13 +214,30 @@ class InteractionMixin:
             widget.verticalScrollBar().valueChanged.connect(self.schedule_workspace_save)
         for widget in self.findChildren(QScrollArea): widget.verticalScrollBar().valueChanged.connect(self.schedule_workspace_save)
         for widget in self.analytics.period_buttons: widget.clicked.connect(self.schedule_workspace_save)
+        self.analytics.chart_tabs.currentChanged.connect(self.schedule_workspace_save)
         self.installEventFilter(self)
         self.set_large_mode(self.store.get('ui_preferences',{}).get('large_mode',False),persist=False)
         self.restore_workspace(); self._interaction_ready=True; self.update_undo_button()
 
-    def notify(self,message,actions=()):
-        if hasattr(self,'notifications'): self.notifications.display(message,actions)
+    def notify(self,message,actions=(),persistent=False):
+        if hasattr(self,'notifications'): self.notifications.display(message,actions,persistent)
         else: self.status.setText(message)
+
+    def open_notifications(self):
+        dialog=QDialog(self); dialog.setWindowTitle('Уведомления за этот запуск'); dialog.resize(720,460); box=QVBoxLayout(dialog)
+        entries=QListWidget(); box.addWidget(entries,1); actions=QHBoxLayout(); box.addLayout(actions)
+        history=list(reversed(self.notifications.history))
+        for message,_ in history: entries.addItem(message)
+        if not history: box.addWidget(label('Уведомлений пока нет.','subtitle'))
+        def select():
+            while actions.count():
+                item=actions.takeAt(0)
+                if item.widget(): item.widget().deleteLater()
+            index=entries.currentRow()
+            if 0<=index<len(history):
+                for title,callback in history[index][1]: actions.addWidget(button(title,lambda checked=False,fn=callback:self.safe(fn)))
+        entries.currentRowChanged.connect(select); entries.setCurrentRow(0)
+        box.addWidget(button('Закрыть',dialog.accept)); dialog.exec()
 
     def notify_export(self,message,path,order_id=None):
         path=Path(path).resolve(); actions=[]
@@ -220,14 +254,14 @@ class InteractionMixin:
 
     def edit_current_quantity(self,row,packs,reason):
         save_order_edit(self.store,self.pid(),self.current,row['id'],packs,reason,self.author()); self.update_undo_button()
-        self.notify('Ручное количество сохранено.',[('Отменить',self.undo_last_edit)])
+        self.notify('Ручное количество сохранено.')
 
     def undo_last_edit(self):
         try:
             if not self.current: raise DataError('Сначала откройте неподтверждённую заявку.')
             name=undo_order_edit(self.store,self.pid(),self.current,self.author())
             self.refresh_order(); self.update_undo_button(); self.notify('Правка отменена: '+name+'. Отмена записана в журнале.')
-        except DataError as exc: self.notify(str(exc))
+        except DataError as exc: self.notify(str(exc),persistent=True)
 
     def update_undo_button(self):
         if hasattr(self,'undo_button'):
@@ -237,18 +271,19 @@ class InteractionMixin:
     def open_selected_card(self):
         index=self.stock_table.currentRow()
         if 0<=index<len(self.visible_stock):
-            self.inventory_rail.setFixedWidth(360); self.inventory_rail.setCurrentWidget(self.ingredient_card); self.refresh_ingredient_card()
+            self.ingredient_dialog.show(); self.refresh_ingredient_card(); self.ingredient_dialog.raise_(); self.ingredient_dialog.activateWindow()
 
     def refresh_ingredient_card(self):
         if getattr(self,'_stock_filling',False): return
-        if not hasattr(self,'ingredient_card') or self.inventory_rail.currentWidget() is not self.ingredient_card: return
+        if not hasattr(self,'ingredient_card') or not self.ingredient_dialog.isVisible(): return
         index=self.stock_table.currentRow()
         if not 0<=index<len(self.visible_stock): self.close_ingredient_card(); return
         draft=self.current if self.current and self.current.get('revision')==self.store.get('revision') and self.current.get('date')==self.calc_day().isoformat() else None
         self.ingredient_card.set_row(self.snapshot,self.visible_stock[index],draft,self.calculation_error)
+        self.ingredient_dialog.setWindowTitle('КРОНА · '+self.visible_stock[index]['name']+' · Подробности и график')
 
     def close_ingredient_card(self):
-        self.inventory_rail.setCurrentIndex(0); self.inventory_rail.setFixedWidth(260)
+        self.ingredient_dialog.close()
 
     def select_ingredient(self,ingredient,correct=False):
         self.select_route('stock','inventory'); self.search.clear(); self.filter.setCurrentIndex(0)
@@ -269,6 +304,10 @@ class InteractionMixin:
                        dict(title='История: сравнить две заявки',callback=self.open_comparison),
                        dict(title='Что, если: сравнить сценарии',callback=self.open_what_if),
                        dict(title='Настройки точки',callback=lambda:self.navigate(4)),
+                       dict(title='Уведомления за этот запуск',callback=self.open_notifications),
+                       dict(title='Помощь: демонстрации обмена',callback=self.open_dalion_demo),
+                       dict(title='Пилот: начать замер заявки',callback=self.start_work,enabled=bool(self.snapshot)),
+                       dict(title='Пилот: завершить замер',callback=self.finish_work,enabled=self.work_button.text()=='Завершить замер'),
                        dict(title='Крупный режим: переключить',callback=lambda:self.set_large_mode(not self.large_mode))])
         for row in self.snapshot['rows'] if self.snapshot else self.inventory_rows:
             result.append(dict(title='Карточка ингредиента: '+row['name'],callback=lambda key=row['id']:self.select_ingredient(key)))
@@ -282,13 +321,19 @@ class InteractionMixin:
         stylesheet=re.sub(r'font-size:\s*(\d+)px',lambda match:f'font-size: {min(36,round(int(match[1])*1.2))}px',STYLE) if enabled else ''
         if enabled: stylesheet+='\nQPushButton { min-height: 22px; } QLineEdit,QComboBox { min-height: 24px; }'
         self.setStyleSheet(stylesheet)
+        self.sidebar.setFixedWidth(228 if enabled else 198)
         for table in self.findChildren(QTableWidget):
             if table.property('normalRowHeight') is None: table.setProperty('normalRowHeight',table.verticalHeader().defaultSectionSize())
             base=table.property('normalRowHeight'); table.verticalHeader().setDefaultSectionSize(round(base*1.2) if enabled else base)
         for title in self.page_titles: title.setWordWrap(bool(enabled))
         if persist:
-            with self.store.db: self.store.put('ui_preferences',{'large_mode':self.large_mode})
+            with self.store.db: self.store.put('ui_preferences',{**self.store.get('ui_preferences',{}),'large_mode':self.large_mode})
         self.update_identity(); self.schedule_workspace_save()
+
+    def set_motion_enabled(self,enabled):
+        self.setProperty('motionEnabled',bool(enabled)); finish_motion(self)
+        self.motion_button.blockSignals(True);self.motion_button.setChecked(bool(enabled));self.motion_button.blockSignals(False)
+        with self.store.db:self.store.put('ui_preferences',{**self.store.get('ui_preferences',{}),'motion_enabled':bool(enabled)})
 
     def schedule_workspace_save(self,*args):
         if getattr(self,'_interaction_ready',False) and not getattr(self,'_ui_closing',False): self.workspace_timer.start(250)
@@ -307,7 +352,8 @@ class InteractionMixin:
             geometry=bytes(self.saveGeometry().toBase64()).decode('ascii'),search=self.search.text(),filter=self.filter.currentIndex(),
             dish=self.chart_dish.currentData(),period=self.analytics.days,history_search=self.history_search.text(),
             ingredient=self.visible_stock[index]['id'] if 0<=index<len(self.visible_stock) else None,
-            card=self.inventory_rail.currentWidget() is self.ingredient_card,
+            card=False,
+            analytics_tab=self.analytics.chart_tabs.currentIndex(),
             scrolls={name:getattr(self,name).verticalScrollBar().value() for name in
                      ('stock_table','order_table','orders_table','audit_table','daily_table','availability_table','pilot_details')},
             analytics_scroll=self.analytics.findChild(QScrollArea).verticalScrollBar().value(),
@@ -334,7 +380,8 @@ class InteractionMixin:
         if isinstance(domain,str) and isinstance(view,str) and domain in self.ROUTES and view in {row[0] for row in self.ROUTES[domain]}|{'settings'}: self.select_route(domain,view)
         for index,row in enumerate(self.visible_stock):
             if row['id']==state.get('ingredient'): self.stock_table.selectRow(index); break
-        if state.get('card') and self.stock_table.currentRow()>=0: self.open_selected_card()
+        tab=state.get('analytics_tab',0)
+        if type(tab) is int and 0<=tab<self.analytics.chart_tabs.count(): self.analytics.chart_tabs.setCurrentIndex(tab)
         if isinstance(state.get('geometry'),str):
             self.restoreGeometry(QByteArray.fromBase64(state['geometry'].encode('ascii')))
             if not any(screen.availableGeometry().intersects(self.frameGeometry()) for screen in QApplication.screens()):
@@ -350,6 +397,8 @@ class InteractionMixin:
         QTimer.singleShot(0,scroll)
 
     def finish_interaction(self):
+        finish_motion(self)
+        if hasattr(self,'ingredient_dialog'): self.ingredient_dialog.close()
         if hasattr(self,'workspace_timer'):
             self.workspace_timer.stop(); self.save_workspace(); self.notifications.timer.stop(); self._ui_closing=True
         if hasattr(self,'day_timer'): self.day_timer.stop()

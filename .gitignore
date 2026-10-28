@@ -1,42 +1,36 @@
+# Python environment and caches
 .venv/
 __pycache__/
 .pytest_cache/
-build/
+*.py[cod]
+.coverage
+htmlcov/
+
+# Build products; source and build.py are versioned
+/build/
+/dist/
 *.spec
-qa/data/
-qa/packaged-data/
-qa/*-data/
-qa/*-smoke/input/
-qa/*-smoke/*.png
-qa/*-smoke/*.xlsx
-qa/*-smoke/smoke-error.txt
-qa/redesign*/
-qa/graph*/
-qa/test-results.xml
+*.exe
+*.zip
+
+# Local databases, credentials and exported operator documents
 *.sqlite3*
-qa/*-error.log
-qa/fixes-smoke/
-qa/fixes-packaged-smoke/
-# Local demonstration evidence; curated release evidence is kept separately.
-qa/dalion-demo-smoke/
-qa/interaction-entry-smoke/
-qa/interaction-smoke/
-qa/operator-features-smoke/
-qa/dalion-demo-tests.xml
-qa/interaction-tests.xml
-qa/operator-features-tests.xml
-qa/release-2026-10-28-tests.xml
-qa/release-2026-10-28-source-smoke/
-qa/release-2026-10-28-exe-smoke/
-qa/import-fix-build/
-qa/import-fix-source-smoke/
-qa/import-fix-exe-smoke/
-qa/import-fix-tests.xml
-qa/startup-fix-build/
-qa/startup-fix-source-smoke/
-qa/startup-fix-exe-smoke/
-qa/startup-fix-tests.xml
-qa/settings-fix-build/
-qa/settings-fix-source-smoke/
-qa/settings-fix-exe-smoke/
-qa/settings-fix-tests.xml
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
+!.env.example
+/saved_top‑up request/
+/examples/import_template.xlsx
+
+# Keep reusable QA scripts, but generate evidence locally
+/qa/*
+!/qa/*.py
+/qa/check_release.py
+/qa/record_verification.py
+/review/
+/release-manifest.json
+/design-preview-manifest.json
+/RELEASE_2026-10-28.md
+/package_release.py

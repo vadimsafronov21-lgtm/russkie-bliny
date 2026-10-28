@@ -43,14 +43,15 @@ def test_restart_restores_views_filters_dish_period_and_large_mode(ui):
     finally: restored.close()
 
 
-def test_side_card_follows_selection_and_does_not_change_data(ui):
+def test_separate_details_window_follows_selection_and_does_not_change_data(ui):
     app,store,window=ui; before=store.get('tables'); window.select_route('stock','inventory')
     window.stock_table.selectRow(0); window.open_selected_card(); app.processEvents()
-    assert window.inventory_rail.currentWidget() is window.ingredient_card
+    assert window.ingredient_dialog.isVisible()
+    assert window.ingredient_dialog.isWindow() and window.ingredient_card.window() is window.ingredient_dialog
     assert window.ingredient_card.ingredient=='dough' and window.ingredient_card.chart.isVisible()
     window.stock_table.selectRow(1); app.processEvents()
     assert window.ingredient_card.ingredient==window.visible_stock[1]['id']
-    window.search.setText('несуществующее'); assert window.inventory_rail.currentIndex()==0
+    window.search.setText('несуществующее'); assert not window.ingredient_dialog.isVisible()
     assert store.get('tables')==before
 
 
@@ -73,7 +74,8 @@ def test_undo_notification_and_confirmed_lock(ui):
     app,store,window=ui; window._make_order(); row=window.current['rows'][0]
     window.edit_current_quantity(row,2,'Проверка количества'); window.refresh_order()
     assert window.undo_button.isEnabled() and not window.notifications.isHidden()
-    window.notifications.actions[0].click(); assert not window.current['edits']
+    assert not window.notifications.actions
+    window.undo_button.click(); assert not window.current['edits']
     window.edit_current_quantity(window.current['rows'][0],3,'Большой заказ'); window.refresh_order()
     window.stock_check.setChecked(True); store.confirm(window.pid(),window.current,'Оператор'); window.reload()
     assert not window.undo_button.isEnabled()

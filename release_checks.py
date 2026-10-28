@@ -14,6 +14,102 @@ from operations import export_pilot,record_forecasts
 from operations_ui import ReviewImportDialog,WhatIfDialog
 
 
+def check_chart_tab_hover(window,folder,application):
+    """Check actual pixels, including Fusion hover painting, in source and frozen Qt."""
+    from PySide6.QtCore import QEvent,QPoint,QPointF,Qt
+    from PySide6.QtGui import QColor,QMouseEvent
+    window.select_route('demand','dynamics'); window.analytics.chart_tabs.setCurrentIndex(0)
+    bar=window.analytics.chart_tabs.tabBar()
+    for large in (False,True):
+        window.set_large_mode(large,persist=False); application.processEvents()
+        rects=[bar.tabRect(index) for index in range(4)]
+        for hovered in (0,1,2,3,-1):
+            pos=rects[hovered].center() if hovered>=0 else QPoint(-20,-20)
+            event=QMouseEvent(QEvent.Type.MouseMove,QPointF(pos),QPointF(bar.mapToGlobal(pos)),
+                             Qt.MouseButton.NoButton,Qt.MouseButton.NoButton,Qt.KeyboardModifier.NoModifier)
+            application.sendEvent(bar,event); application.processEvents(); bar.finish_motion()
+            pixels=bar.grab().toImage(); scale=pixels.devicePixelRatio()
+            for index,rect in enumerate(rects):
+                expected=QColor('#F9E8EB' if index==hovered else '#F6F6F8')
+                for x in (rect.left()+3,rect.center().x(),rect.right()-3):
+                    assert pixels.pixelColor(round(x*scale),round(rect.top()*scale))==expected
+            selected=rects[0]
+            assert pixels.pixelColor(round(selected.center().x()*scale),round((selected.bottom()-1)*scale))==QColor('#A4002A')
+            assert rects==[bar.tabRect(index) for index in range(4)]
+            if hovered==1:
+                window.grab().save(str(Path(folder)/f'chart-hover-{"large" if large else "normal"}.png'))
+    window.set_large_mode(False,persist=False)
+
+
+def check_audit_fixes(window,folder,application):
+    """Verify compact layouts and preserved routes in the actual packaged widgets."""
+    from PySide6.QtCore import QPoint,QRect
+    from PySide6.QtWidgets import QLabel
+    def rect(widget): return QRect(widget.mapTo(window,QPoint()),widget.size())
+    window.select_route('stock','inventory')
+    footnote=next(item for item in window.findChildren(QLabel) if item.text().startswith('¹ По норме'))
+    for width,height,large in [(1180,800,False),(1280,800,False),(1280,800,True),(1560,1020,False)]:
+        window.resize(width,height); window.set_large_mode(large,persist=False)
+        window.notify('Проверка компактного уведомления.'); application.processEvents(); application.processEvents()
+        viewport=rect(window.stock_table.viewport())
+        assert not viewport.intersects(rect(window.details_button)) and not viewport.intersects(rect(footnote))
+        window.grab().save(str(Path(folder)/f'audit-overview-{width}-large{int(large)}.png'))
+    window.select_route('demand','dynamics'); assert not window.notifications.isVisible()
+    panel=window.analytics; panel.chart_tabs.setCurrentIndex(2); application.processEvents()
+    assert not panel.dish_metrics.isVisible() and all(button.isVisible() for button in panel.period_buttons)
+    panel.period_buttons[0].click(); assert panel.days==14 and 'всех блюд' in panel.mix_period.text()
+    window.grab().save(str(Path(folder)/'audit-composition.png'))
+    window.select_route('demand','months'); application.processEvents()
+    assert [panel.chart_tabs.isTabVisible(i) for i in range(4)]==[True,False,False,False]
+    window.select_route('stock','today'); window.daily_table.clearSelection(); application.processEvents()
+    assert not window.daily_action_button.isEnabled()
+    window.run_daily_action(); assert 'Выберите' in window.daily_status.text()
+    window.select_route('demand','pilot'); assert window.work_button.isVisible()
+    window.select_route('stock','imports'); application.processEvents()
+    assert 'покажем изменения' in window.import_hint.text() and not window.import_preparation.body.isVisible()
+    window.import_preparation.toggle.click(); application.processEvents(); assert window.import_preparation.body.isVisible()
+    window.import_preparation.toggle.click(); window.grab().save(str(Path(folder)/'audit-import.png'))
+    window.select_route('stock','settings'); application.processEvents()
+    assert [k for k,v in window.settings_sections.items() if v.body.isVisible()]==['delivery']
+    window.reveal_settings_field(window.author_input); assert window.settings_sections['terminal'].body.isVisible()
+    window.settings_sections['terminal'].setExpanded(False); application.processEvents()
+    window.grab().save(str(Path(folder)/'audit-settings.png'))
+    window.select_route('stock','order'); application.processEvents()
+    assert window.order_table.width()>window.width()-300
+    if (window.current or {}).get('confirmed_order_id'):
+        assert not window.stock_check.isVisible() and not window.undo_button.isVisible()
+    window.grab().save(str(Path(folder)/'audit-order.png'))
+    assert window.notifications.history and window.large_button in window.profile_menu.actions()
+
+
+def check_motion_and_chart_scale(window,folder,application):
+    from PySide6.QtCore import QAbstractAnimation,QEventLoop,QTimer
+    from ui_motion import finish_motion
+    def wait(ms):
+        loop=QEventLoop(); QTimer.singleShot(ms,loop.quit); loop.exec()
+    previous=bool(window.property('motionEnabled'));window.set_motion_enabled(True)
+    window.select_route('stock','inventory');application.processEvents();finish_motion(window)
+    button=window.side_buttons['history'];button.click();wait(50)
+    assert button.isChecked() and 0<button._selected<1
+    wait(210);assert button._selected==1
+    window.select_route('demand','dynamics');window.resize(1920,1030);application.processEvents();finish_motion(window)
+    tabs=window.analytics.chart_tabs;bar=tabs.tabBar();tabs.setCurrentIndex(1);wait(50)
+    assert bar._line_animation.state()==QAbstractAnimation.State.Running and bar._line!=bar._target()
+    tabs.setCurrentIndex(3);tabs.setCurrentIndex(2);wait(220)
+    assert bar._line==bar._target() and window.analytics.mix_chart.geometry_parts()[0].width()>350
+    window.grab().save(str(Path(folder)/'motion-large-composition.png'))
+    tabs.setCurrentIndex(1);wait(210);chart=window.analytics.coverage_chart
+    assert chart.chart_geometry()[1]*len(chart.rows)>chart.height()*.78
+    window.grab().save(str(Path(folder)/'motion-large-coverage.png'))
+    tabs.setCurrentIndex(3);wait(210);panel=window.analytics.stock_timeline
+    assert panel.chart.height()>panel.height()*.7
+    window.grab().save(str(Path(folder)/'motion-large-timeline.png'))
+    assert not any(a.state()==QAbstractAnimation.State.Running for a in window.findChildren(QAbstractAnimation))
+    window.set_motion_enabled(False);window.side_buttons['months'].click();application.processEvents()
+    assert not any(a.state()==QAbstractAnimation.State.Running for a in window.findChildren(QAbstractAnimation))
+    window.set_motion_enabled(previous)
+
+
 def run_feature_checks(window,folder,application):
     if not window.store.get('demo'):
         raise DataError('Проверка сборки требует отдельной базы с синтетическими данными.')
@@ -95,7 +191,8 @@ def run_feature_checks(window,folder,application):
     steps.append('frozen order comparison')
     window.select_route('stock','inventory'); window.stock_table.selectRow(0); window.open_selected_card()
     assert window.ingredient_card.ingredient==str(row['id'])
-    application.processEvents(); window.grab().save(str(folder/'features-ingredient.png')); steps.append('ingredient side card')
+    application.processEvents(); window.grab().save(str(folder/'features-ingredient.png')); steps.append('separate ingredient details window')
+    window.ingredient_dialog.grab().save(str(folder/'ingredient-separate-window.png')); window.close_ingredient_card()
     palette=CommandPalette(window.command_entries(),window); palette.search.setText('сверить тесто')
     assert palette.results.count()==1
     palette.show(); application.processEvents(); palette.grab().save(str(folder/'features-commands.png')); palette.close()
@@ -141,6 +238,9 @@ def run_feature_checks(window,folder,application):
         demo.grab().save(str(folder/'features-dalion.png'))
     finally: demo.close()
     steps.extend(['local DALION HTTP adapter','four independent demonstration scenarios'])
+    check_chart_tab_hover(window,folder,application); steps.append('chart hover pixels and underline in normal and large modes')
+    check_audit_fixes(window,folder,application); steps.append('all seven scenario audit UI findings and compact layout geometry')
+    check_motion_and_chart_scale(window,folder,application); steps.append('finite native motion, rapid retargeting, reduced motion and responsive chart geometry')
     window.search.clear(); window.reload()
     report=dict(status='PASS',frozen=bool(getattr(sys,'frozen',False)),time=now(),steps=steps)
     (folder/'features-result.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')

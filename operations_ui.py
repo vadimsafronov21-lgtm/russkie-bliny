@@ -14,6 +14,7 @@ from exchange_review import apply_import, row_description
 from operations import (availability_events,daily_actions,ensure_operations,export_pilot,
     mark_availability,pilot_report,record_forecasts,simulate,work_session)
 from ui_theme import DataTable
+from ui_motion import MotionTabBar
 
 
 def text(value, role=None):
@@ -84,7 +85,7 @@ class ReviewImportDialog(QDialog):
             box.addWidget(text('Снимок заменит демонстрационные наборы и черновики. История заявок останется.'))
         if plan.duplicate:
             box.addWidget(text('Этот снимок уже загружен. Повтор не изменит данные и ручные правки.'))
-        tabs=QTabWidget(); box.addWidget(tabs,1)
+        tabs=QTabWidget(); tabs.setTabBar(MotionTabBar(background='#FFFFFF')); box.addWidget(tabs,1)
         self.changes=DataTable(['Набор','Ключ','Изменение','Локально','Из источника'])
         fill_rows(self.changes,[[LABELS[row['kind']],' / '.join(row['key']),row['action'],row_description(row['local']),row_description(row['remote'])]
                                 for row in plan.changes]); tabs.addTab(self.changes,'Изменения')
@@ -128,15 +129,15 @@ class OperationsMixin:
         ensure_operations(self.store)
         box=self.page('Что нужно сделать сегодня','Действия по вашей точке · расчётные риски и фактические отметки')
         self.page_actions[5].addWidget(action('Что, если…',self.open_what_if))
-        self.page_actions[5].addWidget(action('Демонстрации',self.open_dalion_demo))
         self.daily_note=text(''); box.addWidget(self.daily_note)
         self.daily_table=DataTable(['Приоритет','Действие','Почему']); box.addWidget(self.daily_table,1)
         self.daily_table.horizontalHeader().setSectionResizeMode(0,QHeaderView.ResizeMode.ResizeToContents)
         self.daily_table.horizontalHeader().setSectionResizeMode(1,QHeaderView.ResizeMode.Stretch)
         self.daily_table.horizontalHeader().setSectionResizeMode(2,QHeaderView.ResizeMode.Stretch)
         self.daily_table.doubleClicked.connect(self.run_daily_action)
-        buttons=QHBoxLayout(); buttons.addWidget(action('Перейти к действию',self.run_daily_action,True))
-        buttons.addWidget(action('Начать замер заявки',self.start_work)); buttons.addWidget(action('Завершить замер',self.finish_work)); buttons.addStretch(); box.addLayout(buttons)
+        buttons=QHBoxLayout(); self.daily_action_button=action('Перейти к действию',self.run_daily_action,True); buttons.addWidget(self.daily_action_button)
+        self.daily_action_button.setEnabled(False); self.daily_table.itemSelectionChanged.connect(self.update_daily_selection)
+        buttons.addStretch(); box.addLayout(buttons)
         self.daily_status=text(''); box.addWidget(self.daily_status)
 
         box=self.page('Наличие блюд','Ручные отметки по точке · отсутствие продаж не означает отсутствие блюда')
@@ -154,10 +155,11 @@ class OperationsMixin:
         dates=QHBoxLayout(); dates.addWidget(text('С'))
         self.pilot_start=QDateEdit(date.today()-timedelta(days=30)); self.pilot_start.setCalendarPopup(True); dates.addWidget(self.pilot_start)
         dates.addWidget(text('По')); self.pilot_end=QDateEdit(date.today()); self.pilot_end.setCalendarPopup(True); dates.addWidget(self.pilot_end)
-        dates.addWidget(action('Показать',self.refresh_pilot,True)); dates.addStretch(); box.addLayout(dates)
+        dates.addWidget(action('Показать',self.refresh_pilot,True)); dates.addStretch()
+        self.work_button=action('Начать замер заявки',self.toggle_work_measurement); dates.addWidget(self.work_button); box.addLayout(dates)
         self.pilot_metrics=DataTable(['Показатель','Значение']); self.pilot_metrics.verticalHeader().setDefaultSectionSize(32)
         self.pilot_metrics.setFixedHeight(244); box.addWidget(self.pilot_metrics)
-        tabs=QTabWidget(); box.addWidget(tabs,1)
+        tabs=QTabWidget(); tabs.setTabBar(MotionTabBar()); box.addWidget(tabs,1)
         self.pilot_details=DataTable(['Дата','Блюдо','Прогноз, порций','Факт, порций','Ошибка, порций']); tabs.addTab(self.pilot_details,'Проверенные прогнозы')
         self.pilot_absence=DataTable(['Блюдо','Зарегистрировано отсутствия, мин','Интервалов']); tabs.addTab(self.pilot_absence,'Отсутствие')
         self.pilot_waste=DataTable(['Ингредиент','Количество','Единица']); tabs.addTab(self.pilot_waste,'Списания')
@@ -170,11 +172,16 @@ class OperationsMixin:
         self.daily_items=daily_actions(self.store,self.pid(),self.calc_day(),self.snapshot,self.calculation_error)
         fill_rows(self.daily_table,[[['Срочно','Проверить','По плану'][row['priority']],row['title'],row['detail']] for row in self.daily_items])
         self.daily_note.setText(('ДЕМО · ' if self.store.get('demo') else '')+f'Действий: {len(self.daily_items)} · '+self.point.currentText())
+        self.update_daily_selection()
         self.refresh_availability(); self.refresh_pilot()
+
+    def update_daily_selection(self):
+        self.daily_action_button.setEnabled(bool(self.daily_table.selectedItems()))
 
     def run_daily_action(self,*args):
         index=self.daily_table.currentRow()
-        if index<0 or index>=len(self.daily_items): return
+        if not self.daily_table.selectedItems() or index<0 or index>=len(self.daily_items):
+            self.daily_status.setText('Выберите действие в списке.'); return
         task=self.daily_items[index]; route=task['route']
         self.select_route('demand' if route=='availability' else 'stock',route)
         if task.get('ingredient'):
@@ -210,15 +217,29 @@ class OperationsMixin:
     def start_work(self):
         try:
             if not self.snapshot: raise DataError('Сначала восстановите расчёт и проверьте график.')
-            work_session(self.store,self.pid(),self.author()); self.daily_status.setText('Замер начат. После подготовки нажмите «Завершить замер».')
+            work_session(self.store,self.pid(),self.author()); self.refresh_work_measurement()
             self.make_order()
-        except (DataError,sqlite3.Error) as exc: self.daily_status.setText(str(exc))
+            self.notify('Замер начат. Завершите его в отчёте пилота.',[('Завершить замер',self.finish_work)])
+        except (DataError,sqlite3.Error) as exc: self.pilot_status.setText(str(exc))
 
     def finish_work(self):
         try:
             work_session(self.store,self.pid(),self.author(),finish=True)
-            self.daily_status.setText('Продолжительность сохранена в отчёте пилота.'); self.refresh_pilot()
-        except DataError as exc: self.daily_status.setText(str(exc))
+            self.pilot_status.setText('Продолжительность сохранена в отчёте пилота.'); self.refresh_pilot()
+            self.notify('Продолжительность подготовки сохранена в отчёте пилота.')
+        except DataError as exc: self.pilot_status.setText(str(exc))
+
+    def refresh_work_measurement(self):
+        active=self.store.db.execute('SELECT started FROM work_sessions WHERE point=? AND demo=? AND ended IS NULL',
+                                   (self.pid(),int(bool(self.store.get('demo'))))).fetchone()
+        self.work_button.setText('Завершить замер' if active else 'Начать замер заявки')
+        self.work_button.setToolTip('Начат '+active[0][:19].replace('T',' ') if active else 'Измерить время подготовки заявки для пилота')
+        self.work_button.setEnabled(bool(active) or bool(self.snapshot))
+        return bool(active)
+
+    def toggle_work_measurement(self):
+        if self.refresh_work_measurement(): self.finish_work()
+        else: self.start_work()
 
     def capture_pilot(self):
         try:
@@ -230,6 +251,7 @@ class OperationsMixin:
 
     def refresh_pilot(self):
         if not hasattr(self,'pilot_metrics'): return
+        self.refresh_work_measurement()
         self.pilot_result=None
         try:
             report=pilot_report(self.store,self.pid(),self.pilot_start.date().toPython(),self.pilot_end.date().toPython())

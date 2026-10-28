@@ -23,10 +23,11 @@ from core import Store,DataError,calculate,calculation_day,order_impact,now,expo
 from charts import StockProjectionChart
 from workflows import StockCorrectionDialog,QuantityDialog,OrderDetailsDialog,dialog_buttons,order_total,readable_change,ReasonPicker,remember_reason,ITEM_SETTING_REASONS
 
-from ui_theme import STYLE,ASSETS,BURGUNDY,INK,DataTable,svg_icon,configure_application
+from ui_theme import STYLE,ASSETS,BURGUNDY,INK,DataTable,Disclosure,svg_icon,configure_application
+from ui_motion import MotionButton,MotionLabel
 
 def label(text,name=None):
-    w=QLabel(text)
+    w=MotionLabel(text) if name in ('title','chartTitle') else QLabel(text)
     if name: w.setObjectName(name)
     return w
 
@@ -60,7 +61,7 @@ def fill(t,rows,colors=None):
 
 class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindow):
     def __init__(self,store):
-        super().__init__(); self.store=store; self.store.sync_day(); self.current=None; self.busy=False; self.stock_revision=None; self.page_actions=[]; self.calculation_error=None
+        super().__init__(); self.store=store; self.setProperty('motionEnabled',self.store.get('ui_preferences',{}).get('motion_enabled',True)); self.store.sync_day(); self.current=None; self.busy=False; self.stock_revision=None; self.page_actions=[]; self.calculation_error=None
         self.setWindowTitle('КРОНА · Русские блины'); self.resize(1560,1020); self.setMinimumSize(1180,800)
         self.build_workspace()
         self.build_stock(); self.build_order(); self.build_import(); self.build_history(); self.build_settings()
@@ -87,7 +88,7 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
     def resolve_problem(self):
         self.navigate(4 if self.calculation_error and 'постав' in self.calculation_error.lower() else 2)
         if self.active_view=='settings':
-            self.settings_scroll.ensureWidgetVisible(self.delivery_input); self.delivery_input.setFocus()
+            self.reveal_settings_field(self.delivery_input)
     def page(self,title,subtitle):
         p=QWidget(); box=QVBoxLayout(p); box.setContentsMargins(0,0,0,0); box.setSpacing(18)
         heading=QHBoxLayout(); heading.setSpacing(20); wording=QVBoxLayout(); wording.setSpacing(7)
@@ -102,6 +103,8 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
         except (DataError,OSError,ValueError,KeyError,sqlite3.Error) as e: self.error(e)
     def network_changed(self):
         self.status.setText('Режим без связи. Прогноз, черновики и экспорт работают на этом компьютере.' if self.offline.isChecked() else 'Сохранение на этом компьютере. Подключение к учётным системам не настроено.')
+        self.local_status.setText('Без связи · данные локально' if self.offline.isChecked() else 'Данные на этом компьютере')
+        self.local_status.setToolTip(self.status.text())
 
     def point_changed(self):
         self.stock_revision=None; self.stock_check.setChecked(False)
@@ -116,7 +119,7 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
         self.delivery_input.setEnabled(bool(schedules)); self.interval_input.setEnabled(bool(schedules))
 
     def build_stock(self):
-        box=self.page('Остатки и предупреждения','Запасы, актуальность данных и заявка на пополнение')
+        box=self.page('Остатки и предупреждения','Сначала сверьте фактические остатки. Затем сформируйте заявку на пополнение.')
         primary=button('Сформировать заявку',self.make_order,True); primary.setIcon(svg_icon('arrow','#FFFFFF')); self.page_actions[0].addWidget(primary)
         self.page_actions[0].addWidget(button('Что, если…',self.open_what_if))
         self.stock_views=QStackedWidget(); box.addWidget(self.stock_views,1)
@@ -124,40 +127,34 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
         self.chart_dish=self.analytics.dish_combo; self.chart=self.analytics.sales_chart
         inventory_page=QWidget(); inventory_box=QVBoxLayout(inventory_page); inventory_box.setContentsMargins(0,0,0,0); inventory_box.setSpacing(18)
         summary=QHBoxLayout(); summary.setSpacing(38); self.metrics=[]
-        for j,name in enumerate(['Ингредиентов','К пополнению','Возможный излишек']):
+        for j,name in enumerate(['Ингредиентов','К пополнению','Возможный излишек','Ближайшая поставка']):
             metric=QVBoxLayout(); metric.setSpacing(3); row=QHBoxLayout(); val=label('—','metricAlert' if j==1 else 'number'); self.metrics.append(val); row.addWidget(val); row.addStretch(); metric.addLayout(row); metric.addWidget(label(name,'subtitle')); summary.addLayout(metric)
         summary.addStretch(); inventory_box.addLayout(summary)
-        main=QHBoxLayout(); main.setSpacing(20); left=QVBoxLayout(); left.setSpacing(16)
+        self.delivery_date=self.metrics[3]
+        context=QFrame(); context.setObjectName('surface'); context_box=QHBoxLayout(context); context_box.setContentsMargins(16,10,16,10); context_box.setSpacing(20)
+        self.fresh=label('','subtitle'); self.fresh.setWordWrap(True); context_box.addWidget(self.fresh,2)
+        self.delivery_period=label('','subtitle'); self.delivery_period.setWordWrap(True); context_box.addWidget(self.delivery_period,1)
+        context_box.addWidget(button('Проверить данные',lambda:self.navigate(2)))
+        context_box.addWidget(button('График поставок',lambda:self.navigate(4)))
+        inventory_box.addWidget(context)
         inventory=QFrame(); inventory.setObjectName('surface'); inventorybox=QVBoxLayout(inventory); inventorybox.setContentsMargins(0,0,0,6); inventorybox.setSpacing(0)
         toolbar=QHBoxLayout(); toolbar.setContentsMargins(18,12,18,9); toolbar.setSpacing(6)
         self.stock_tabs=[]
         for idx,text in enumerate(['Все','Пополнить','Излишек']):
-            tab=button(text,lambda checked=False,i=idx:self.filter.setCurrentIndex(i)); tab.setObjectName('tab'); tab.setCheckable(True); self.stock_tabs.append(tab); toolbar.addWidget(tab)
+            tab=MotionButton(text,'line'); tab.clicked.connect(lambda checked=False,i=idx:self.filter.setCurrentIndex(i)); tab.setObjectName('tab'); self.stock_tabs.append(tab); toolbar.addWidget(tab)
         toolbar.addStretch(); self.search=QLineEdit(); self.search.setObjectName('search'); self.search.setPlaceholderText('Поиск  ·  Ctrl+K'); self.search.addAction(svg_icon('search','#969AA6'),QLineEdit.ActionPosition.LeadingPosition); self.search.setClearButtonEnabled(True); self.search.textChanged.connect(self.refresh_stock); toolbar.addWidget(self.search)
         self.filter=QComboBox(); self.filter.addItems(['Все позиции','Нужно пополнить','Возможен излишек']); self.filter.hide(); self.filter.currentIndexChanged.connect(self.refresh_stock)
         inventorybox.addLayout(toolbar)
-        self.stock_table=table(['Ингредиент','Факт','Порций¹','На период','Состояние']); self.stock_table.setMinimumHeight(280); self.stock_table.doubleClicked.connect(self.explain_stock); inventorybox.addWidget(self.stock_table,1)
+        self.stock_table=table(['Ингредиент','Факт','Порций¹','На период','Состояние']); self.stock_table.setMinimumHeight(100); self.stock_table.doubleClicked.connect(self.explain_stock); inventorybox.addWidget(self.stock_table,1)
         tablefoot=QHBoxLayout(); tablefoot.setContentsMargins(17,7,17,4)
         footnote=label('¹ По норме техкарты. Общие ингредиенты не суммируются в порции.','subtitle'); footnote.setWordWrap(True); tablefoot.addWidget(footnote,1)
-        stock_chart=button('График запаса',self.open_stock_chart); stock_chart.setObjectName('quiet'); tablefoot.addWidget(stock_chart)
-        edit=button('Сверить / списать',self.edit_stock); edit.setObjectName('quiet'); edit.setIcon(svg_icon('edit',BURGUNDY,17)); tablefoot.addWidget(edit); inventorybox.addLayout(tablefoot); left.addWidget(inventory,1)
-        main.addLayout(left,1)
-        rail=QWidget(); rail.setFixedWidth(252); right=QVBoxLayout(rail); right.setContentsMargins(0,0,0,0); right.setSpacing(18)
-        delivery=QFrame(); delivery.setObjectName('delivery'); d=QVBoxLayout(delivery); d.setContentsMargins(21,22,21,21); d.setSpacing(13)
-        d.addWidget(label('БЛИЖАЙШАЯ ПОСТАВКА','deliveryMeta')); self.delivery_date=label('—','deliveryDate'); self.metrics.append(self.delivery_date); d.addWidget(self.delivery_date)
-        self.delivery_period=label('Период покрытия —','deliveryMeta'); self.delivery_period.setWordWrap(True); d.addWidget(self.delivery_period)
-        d.addSpacing(4); delivery_settings=button('Проверить график',lambda:self.navigate(4)); d.addWidget(delivery_settings); right.addWidget(delivery)
-        info=QFrame(); info.setObjectName('surface'); info_box=QVBoxLayout(info); info_box.setContentsMargins(18,19,18,19); info_box.setSpacing(14); info_box.addWidget(label('Данные к расчёту','section'))
-        self.fresh=label('','success'); self.fresh.setWordWrap(True); info_box.addWidget(self.fresh)
-        rule=QFrame(); rule.setObjectName('separator'); info_box.addWidget(rule)
-        control=label('Пригодность партий\nподтверждает продавец','subtitle'); control.setWordWrap(True); info_box.addWidget(control)
-        details=button('Проверить данные',lambda:self.navigate(2)); details.setObjectName('quiet'); details.setIcon(svg_icon('arrow',BURGUNDY,16)); info_box.addWidget(details); right.addWidget(info)
-        note=label('Перед заказом\nсверьте фактическое наличие.\nРекомендация останется\nдоступной для изменений.','subtitle'); note.setWordWrap(True); note.setContentsMargins(4,2,4,0); right.addWidget(note); right.addStretch()
-        delivery.setMinimumHeight(205); info.setMinimumHeight(300)
-        rail_scroll=QScrollArea(); rail_scroll.setWidgetResizable(True); rail_scroll.setFrameShape(QFrame.Shape.NoFrame); rail_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff); rail_scroll.setWidget(rail)
-        self.inventory_rail=QStackedWidget(); self.inventory_rail.setFixedWidth(260); self.inventory_rail.addWidget(rail_scroll); main.addWidget(self.inventory_rail)
-        inventory_box.addLayout(main,1)
-        self.stock_views.addWidget(inventory_page); self.stock_views.setCurrentIndex(1)
+        self.stock_table.setToolTip('Один щелчок — выбрать строку. Двойной щелчок — открыть подробности и график в отдельном окне.')
+        self.details_button=button('Подробности и график',self.open_selected_card); self.details_button.setObjectName('quiet'); self.details_button.setIcon(svg_icon('chart',BURGUNDY,17)); tablefoot.addWidget(self.details_button)
+        edit=button('Сверить / списать',self.edit_stock); edit.setObjectName('quiet'); edit.setIcon(svg_icon('edit',BURGUNDY,17)); tablefoot.addWidget(edit); inventorybox.addLayout(tablefoot)
+        inventory_box.addWidget(inventory,1)
+        self.inventory_scroll=QScrollArea(); self.inventory_scroll.setWidgetResizable(True); self.inventory_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.inventory_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff); self.inventory_scroll.setWidget(inventory_page)
+        self.stock_views.addWidget(self.inventory_scroll); self.stock_views.setCurrentIndex(1)
 
 
 
@@ -180,13 +177,16 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
         if self.snapshot:
             s=self.snapshot; last=s.get('last_closed') or 'нет данных'; stale=not s.get('last_closed') or (max(self.calc_day(),date.today())-date.fromisoformat(last)).days>1
             readable=date.fromisoformat(last).strftime('%d.%m.%Y') if s.get('last_closed') else last
-            self.fresh.setText(f'{"Данные устарели.\n" if stale else ""}Закрытая смена\n{readable}\n\nИмпорт\n{str(self.store.get("import_time","—"))[:19].replace("T","  " )}\n\nПродажи текущей смены\nещё не получены.')
+            imported=str(self.store.get('import_time','—'))[:19].replace('T',' ')
+            self.fresh.setText(('Данные устарели · ' if stale else '')+f'Закрытая смена: {readable}\nИмпорт: {imported}')
+            self.fresh.setToolTip('Продажи текущей смены ещё не получены. Пригодность партий подтверждает продавец.')
             self.delivery_period.setText(f'Покрытие на {s["days"]} дня\nдо {date.fromisoformat(s["end"]).strftime("%d.%m")} (не включая)')
             delivery=date.fromisoformat(s['arrival']); months=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря']
             rows=s['rows']; vals=[str(len(rows)),str(sum(r['packs']>0 for r in rows)),str(sum(r['surplus']>r['target'] for r in rows)),f'{delivery.day} {months[delivery.month-1]}']
             for l,v in zip(self.metrics,vals): l.setText(v)
         else:
-            self.fresh.setText('Сохранённые остатки загружены.\nИмпорт: '+str(self.store.get('import_time','—'))[:19].replace('T',' ')+'\n\nРасчёт недоступен.\n'+(self.calculation_error or 'Проверьте данные.'))
+            self.fresh.setText('Сохранённые остатки загружены\nИмпорт: '+str(self.store.get('import_time','—'))[:19].replace('T',' '))
+            self.fresh.setToolTip(self.calculation_error or 'Проверьте данные.')
             self.delivery_period.setText('Период не рассчитан')
             for l in self.metrics: l.setText('—')
             self.metrics[0].setText(str(len(self.inventory_rows)))
@@ -240,9 +240,7 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
             self.notify(self.calculation_error or 'Расчёт запаса недоступен.',[('Проверить',self.resolve_problem)]); return
         i=self.stock_table.currentRow()
         if i<0 or i>=len(self.visible_stock): return
-        ingredient=self.visible_stock[i]['id']; panel=self.analytics.stock_timeline
-        panel.ingredient.setCurrentIndex(panel.ingredient.findData(ingredient)); self.navigate(0); self.switch_stock_view(0)
-        self.analytics.findChild(QScrollArea).ensureWidgetVisible(panel,0,0)
+        self.open_selected_card()
     def show_explanation(self,r):
         dialog=QDialog(self); dialog.setWindowTitle('Расчёт рекомендации'); dialog.resize(800,800); layout=QVBoxLayout(dialog); layout.setContentsMargins(28,25,28,24); layout.setSpacing(14)
         header=QHBoxLayout(); words=QVBoxLayout(); words.addWidget(label(r['name'],'title')); words.addWidget(label('Как получено количество к заказу','subtitle')); header.addLayout(words,1); layout.addLayout(header)
@@ -275,37 +273,42 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
     def build_order(self):
         box=self.page('Заявка на поставку','Проверьте рекомендацию, скорректируйте количество и сохраните в Excel')
         self.recalc_btn=button('Пересчитать',self.make_order); self.recalc_btn.setIcon(svg_icon('refresh',BURGUNDY,18)); self.page_actions[1].addWidget(self.recalc_btn)
-        self.cover=label('Сначала сформируйте заявку','success'); box.addWidget(self.cover)
-        main=QHBoxLayout(); main.setSpacing(20); left=QVBoxLayout(); left.setSpacing(16)
+        self.cover=label('Сначала сформируйте заявку','success'); self.cover.setWordWrap(True); box.addWidget(self.cover)
+        main=QVBoxLayout(); main.setSpacing(10); left=QVBoxLayout(); left.setSpacing(10)
         surface=QFrame(); surface.setObjectName('surface'); contents=QVBoxLayout(surface); contents.setContentsMargins(0,0,0,8); contents.setSpacing(0)
         tabs=QHBoxLayout(); tabs.setContentsMargins(18,9,18,0); self.order_tabs=[]
         for i,name in enumerate(['Ингредиенты к заказу','Прогноз блюд']):
-            tab=button(name,lambda checked=False,ix=i:self.switch_order_tab(ix)); tab.setObjectName('tab'); tab.setCheckable(True); self.order_tabs.append(tab); tabs.addWidget(tab)
+            tab=MotionButton(name,'line'); tab.clicked.connect(lambda checked=False,ix=i:self.switch_order_tab(ix)); tab.setObjectName('tab'); self.order_tabs.append(tab); tabs.addWidget(tab)
         tabs.addStretch(); contents.addLayout(tabs)
         self.order_views=QStackedWidget()
         self.order_table=table(['Ингредиент','Потребность','Совет, уп.','Итог, уп.','К заказу','Сумма, ₽']); self.order_table.doubleClicked.connect(self.edit_order); self.order_table.empty_text('Начните с расчёта заявки','Нажмите «Пересчитать», чтобы получить рекомендации')
         self.forecast_table=table(['Блюдо','Порций','Диапазон','Спрос','Метод']); self.forecast_table.doubleClicked.connect(self.explain_forecast); self.forecast_table.empty_text('Прогноз ещё не рассчитан','Он появится вместе с рекомендациями к заказу')
         self.order_views.addWidget(self.order_table); self.order_views.addWidget(self.forecast_table); contents.addWidget(self.order_views,1)
-        line=QHBoxLayout(); line.setContentsMargins(16,8,16,2); self.edit_order_btn=button('Изменить количество',self.edit_order); self.edit_order_btn.setIcon(svg_icon('edit',BURGUNDY,17)); line.addWidget(self.edit_order_btn); self.explain_order_btn=button('Объяснить расчёт',lambda:self.explain_order() if self.order_views.currentIndex()==0 else self.explain_forecast()); self.explain_order_btn.setObjectName('quiet'); line.addWidget(self.explain_order_btn); line.addStretch(); contents.addLayout(line)
+        line=QHBoxLayout(); self.order_edit_actions=line; line.setContentsMargins(16,8,16,2); self.edit_order_btn=button('Изменить количество',self.edit_order); self.edit_order_btn.setIcon(svg_icon('edit',BURGUNDY,17)); line.addWidget(self.edit_order_btn); self.explain_order_btn=button('Объяснить расчёт',lambda:self.explain_order() if self.order_views.currentIndex()==0 else self.explain_forecast()); self.explain_order_btn.setObjectName('quiet'); line.addWidget(self.explain_order_btn); line.addStretch(); contents.addLayout(line)
         left.addWidget(surface,1)
-        note=label('Двойной щелчок по строке меняет количество. В прогнозе — раскрывает сравнение методов. Диапазон спроса не является гарантией вероятности.','subtitle'); note.setWordWrap(True); left.addWidget(note)
         main.addLayout(left,1)
-        rail=QWidget(); rail.setFixedWidth(280); right=QVBoxLayout(rail); right.setContentsMargins(0,0,0,0); right.setSpacing(16)
-        totalcard=QFrame(); totalcard.setObjectName('surface'); totalcard.setMinimumHeight(320); totalbox=QVBoxLayout(totalcard); totalbox.setContentsMargins(21,22,21,22); totalbox.setSpacing(15)
-        totalbox.addWidget(label('ИТОГО ПО ЗАЯВКЕ','eyebrow')); self.total=label('—','total'); totalbox.addWidget(self.total); totalbox.addWidget(label('По себестоимости ингредиентов','subtitle'))
-        sep=QFrame(); sep.setObjectName('separator'); totalbox.addWidget(sep)
+        self.order_warn=label('','notice'); self.order_warn.setWordWrap(True)
+        self.order_warnings_scroll=QScrollArea(); self.order_warnings_scroll.setWidgetResizable(True); self.order_warnings_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.order_warnings_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff); self.order_warnings_scroll.setMaximumHeight(125); self.order_warnings_scroll.setMinimumHeight(46)
+        self.order_warnings_scroll.setWidget(self.order_warn); main.addWidget(self.order_warnings_scroll)
+        self.order_details=Disclosure('Как рассчитана сумма и как сохранить заявку')
+        self.order_detail_note=label('Сумма — по себестоимости ингредиентов. Ручное количество хранится отдельно от рекомендации. '
+                                    'Диапазон спроса не является гарантией вероятности. Подтверждение сохраняет заявку в истории; Excel экспортируется отдельно. Поставщику заявка не отправляется.','subtitle')
+        self.order_detail_note.setWordWrap(True); self.order_details.box.addWidget(self.order_detail_note); main.addWidget(self.order_details)
+        self.order_waste_note=label('Есть списания за 28 дней — проверьте излишки и редкий спрос. Дополнительный страховой запас не добавлен.','subtitle')
+        self.order_waste_note.setWordWrap(True); self.order_details.box.addWidget(self.order_waste_note); self.order_waste_note.hide()
+        totalcard=QFrame(); totalcard.setObjectName('surface'); totalbox=QHBoxLayout(totalcard); totalbox.setContentsMargins(16,12,16,12); totalbox.setSpacing(20)
+        self.total=label('—','total'); totalbox.addWidget(self.total); totalbox.addStretch()
         self.stock_check=QCheckBox('Остатки и пригодность\nпартий сверены мной'); self.stock_check.toggled.connect(self.check_stock); totalbox.addWidget(self.stock_check)
         self.confirm_btn=button('Подтвердить и сохранить',self.confirm_order,True); self.confirm_btn.setIcon(svg_icon('check','#FFFFFF',18)); totalbox.addWidget(self.confirm_btn)
-        detail=label('Заявка сохранится в истории.\nВы выберете файл Excel.','subtitle'); detail.setWordWrap(True); totalbox.addWidget(detail); right.addWidget(totalcard)
-        right.addWidget(label('Перед подтверждением','section')); self.order_warn=label('','notice'); self.order_warn.setWordWrap(True); self.order_warn.setSizePolicy(QSizePolicy.Policy.Preferred,QSizePolicy.Policy.Minimum); right.addWidget(self.order_warn)
-        manual=label('Ваше количество сохраняется\nотдельно от рекомендации.\nПоставщику заявка не отправляется.','subtitle'); manual.setWordWrap(True); manual.setMinimumHeight(50); right.addWidget(manual); right.addStretch()
-        order_scroll=QScrollArea(); order_scroll.setWidgetResizable(True); order_scroll.setFrameShape(QFrame.Shape.NoFrame); order_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff); order_scroll.setFixedWidth(288); order_scroll.setWidget(rail); main.addWidget(order_scroll); box.addLayout(main,1)
+        main.addWidget(totalcard); box.addLayout(main,1)
         self.switch_order_tab(0)
 
     def switch_order_tab(self,index):
         self.order_views.setCurrentIndex(index)
         for i,tab in enumerate(self.order_tabs): tab.setChecked(i==index)
         self.edit_order_btn.setVisible(index==0)
+        if hasattr(self,'undo_button'): self.undo_button.setVisible(index==0 and not (self.current or {}).get('confirmed_order_id'))
         self.explain_order_btn.setText('Объяснить расчёт' if index==0 else 'Сравнение методов прогноза')
 
     def check_stock(self,checked):
@@ -343,8 +346,11 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
         p=self.current
         confirmed=bool(p and p.get('confirmed_order_id'))
         self.edit_order_btn.setEnabled(not confirmed); self.stock_check.setEnabled(not confirmed)
+        self.stock_check.setVisible(not confirmed); self.edit_order_btn.setVisible(not confirmed and self.order_views.currentIndex()==0)
+        if hasattr(self,'undo_button'): self.undo_button.setVisible(not confirmed and self.order_views.currentIndex()==0)
         self.recalc_btn.setText('Новая заявка' if confirmed else 'Пересчитать')
         self.confirm_btn.setText(f'Экспортировать №{p["confirmed_order_id"]}' if confirmed else 'Подтвердить и сохранить')
+        self.order_warnings_scroll.setVisible(not confirmed)
         if not p:
             self.cover.setText('Сначала сформируйте заявку'); fill(self.order_table,[]); fill(self.forecast_table,[]); self.order_warn.setText('Черновик ещё не создан.'); self.confirm_btn.setEnabled(False); self.busy=False; return
         self.cover.setText(f'Поставка {date.fromisoformat(p["arrival"]).strftime("%d.%m")}   ·   Покрытие на {p["days"]} дня: {date.fromisoformat(p["date"]).strftime("%d.%m")} — {date.fromisoformat(p["end"]).strftime("%d.%m")} (не включая)')
@@ -355,13 +361,14 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
         if errors: warns+=errors
         if any(r['shortage_before']>0 for r in p['rows']): warns.append('Есть дефицит до доставки: обычная заявка не закроет этот разрыв. Проверьте ускоренное пополнение.')
         if any(r['timing_gap']>0 for r in p['rows']): warns.append('Часть поступлений придёт позже потребности. Проверьте даты и ускоренное пополнение.')
-        if any(r['waste']>0 for r in p['rows']): warns.append('Есть фактические списания за 28 дней — проверьте излишки и редкий спрос. Дополнительный страховой запас не добавлен.')
         if any(r['unknown_dates'] for r in p['rows']): warns.append('Даты пригодности не заданы. Проверьте партии по действующим правилам точки.')
-        self.order_warn.setText('\n\n'.join(warns) or 'Расчёт готов к проверке продавцом.')
+        self.order_warn.setText('\n'.join(warns) or 'Расчёт готов к проверке продавцом.')
+        self.order_warnings_scroll.setVisible(bool(warns) and not confirmed)
+        self.order_waste_note.setVisible(any(r['waste']>0 for r in p['rows']))
         if confirmed:
             self.cover.setText(f'Заявка №{p["confirmed_order_id"]} сохранена · поставка {p["arrival"]} · отправка поставщику не подтверждена')
             self.order_warn.setText('Состав заявки зафиксирован. Повторный экспорт использует тот же номер.\n\nДля нового расчёта нажмите «Новая заявка».')
-        self.order_warn.setMinimumHeight(self.order_warn.heightForWidth(280))
+        self.order_warn.setMinimumHeight(0)
         rendered=[]; total=0
         for r in p['rows']:
             e=p.get('edits',{}).get(r['id']); n=e['packs'] if e else r['packs']; total+=n*r['pack']*r['cost']
@@ -411,17 +418,20 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
     def build_import(self):
         box=self.page('Данные и импорт','Продажи закрытых смен, фактические остатки и технологические карты')
         upload=button('Импортировать файл',self.import_data,True); upload.setIcon(svg_icon('import','#FFFFFF')); self.page_actions[2].addWidget(upload)
-        hint=label('XLSX или CSV. Загружаемая таблица заменяется целиком. Повторный файл не добавляет дубли.','success'); box.addWidget(hint)
-        main=QHBoxLayout(); main.setSpacing(20); left=QVBoxLayout(); left.setSpacing(16)
+        self.import_hint=label('Перед загрузкой покажем изменения. Конфликты с локальными правками нужно проверить.','success')
+        self.import_hint.setWordWrap(True); box.addWidget(self.import_hint)
         surface=QFrame(); surface.setObjectName('surface'); surfacebox=QVBoxLayout(surface); surfacebox.setContentsMargins(0,0,0,0)
-        self.quality=table(['Набор данных','Строк','Содержимое']); self.quality.horizontalHeader().setSectionResizeMode(0,QHeaderView.ResizeMode.ResizeToContents); self.quality.horizontalHeader().setSectionResizeMode(2,QHeaderView.ResizeMode.Stretch); self.quality.verticalHeader().setDefaultSectionSize(52); surfacebox.addWidget(self.quality); left.addWidget(surface,1)
-        left.addWidget(label('Результат проверки','section')); self.import_report=QTextEdit(); self.import_report.setReadOnly(True); self.import_report.setMaximumHeight(170); left.addWidget(self.import_report); main.addLayout(left,1)
-        rail=QFrame(); rail.setObjectName('surface'); rail.setFixedWidth(260); r=QVBoxLayout(rail); r.setContentsMargins(20,22,20,22); r.setSpacing(15); r.addWidget(label('Подготовка файла','section'))
-        info=label('Начните с полного XLSX.\nДля отдельных CSV сначала\nзагрузите points и items.','subtitle'); info.setWordWrap(True); r.addWidget(info)
-        r.addWidget(button('Шаблоны XLSX / CSV',lambda:self.templates(False))); r.addWidget(button('Демо-пример',lambda:self.templates(True)))
-        r.addWidget(button('Демо обмена с ДАЛИОН',self.open_dalion_demo))
-        sep=QFrame(); sep.setObjectName('separator'); r.addWidget(sep)
-        rules=label('Обязательны единицы,\nвремя сверки, версия техкарты\nи график поставок.\n\nПустая ячейка не означает ноль.\nПригодность подтверждает\nпродавец на точке.','subtitle'); rules.setWordWrap(True); r.addWidget(rules); r.addStretch(); main.addWidget(rail); box.addLayout(main,1)
+        self.quality=table(['Набор данных','Строк','Содержимое']); self.quality.horizontalHeader().setSectionResizeMode(0,QHeaderView.ResizeMode.ResizeToContents)
+        self.quality.horizontalHeader().setSectionResizeMode(2,QHeaderView.ResizeMode.Stretch); self.quality.verticalHeader().setDefaultSectionSize(48)
+        surfacebox.addWidget(self.quality); box.addWidget(surface,1)
+        self.quality_summary=label('','subtitle'); self.quality_summary.setWordWrap(True); box.addWidget(self.quality_summary)
+        self.import_report=QTextEdit(); self.import_report.setReadOnly(True); self.import_report.setMaximumHeight(130); box.addWidget(self.import_report)
+        self.import_preparation=Disclosure('Подготовка файла и шаблоны'); box.addWidget(self.import_preparation)
+        info=label('XLSX содержит полный снимок. Для CSV выберите набор данных; сначала загрузите points и items. '
+                   'Локальные изменения проверяются в предпросмотре. Пустые ячейки не заменяются нулями. '
+                   'Пригодность и полноту данных подтверждает оператор. Прямые подключения Frontol / ДАЛИОН не настроены.','subtitle')
+        info.setWordWrap(True); self.import_preparation.box.addWidget(info)
+        self.import_preparation.box.addWidget(button('Получить шаблоны XLSX / CSV',lambda:self.templates(False)))
 
     def refresh_quality(self):
         if not hasattr(self,'quality'): return
@@ -429,7 +439,8 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
         kinds=('points','items','sales') if self.active_domain=='demand' else tuple(k for k in SCHEMAS if k!='sales')
         fill(self.quality,[[LABELS[k],len(tables.get(k,[])),notes[k]] for k in kinds])
         errors=([self.calculation_error] if self.calculation_error else (self.snapshot or {}).get('errors',[]))
-        self.import_report.setPlainText('Качество расчёта:\n'+ ('\n'.join(errors) if errors else 'Структурные ошибки не обнаружены. Пригодность, полнота продаж и корректность техкарт требуют проверки на точке.')+'\n\nПрямые подключения Frontol / ДАЛИОН не настроены. Демо обмена работает с локальным имитатором и отдельной базой.\nДаты партий необязательны и не выводятся из даты прихода. Незакрытые смены отклоняются.\nПустые ячейки не заменяются нулями. Пустой use_before означает неизвестную дату.\nДля нулевых продаж нужна явная строка; пропущенный день остаётся неизвестным.')
+        self.quality_summary.setText('Расчёт требует проверки — причины ниже.' if errors else 'Структурных ошибок не найдено. Полноту данных, техкарты и пригодность проверьте на точке.')
+        self.import_report.setPlainText('\n'.join(errors)); self.import_report.setVisible(bool(errors))
     def open_dalion_demo(self):
         from dalion_demo import DalionDemoDialog
         dialog=getattr(self,'dalion_demo_dialog',None)
@@ -475,7 +486,8 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
             for p in self.store.get('tables',{}).get('points',[]): self.point.addItem(p['name'],str(p['id']))
             self.point.blockSignals(False); self.fill_item_settings(); self.point_changed()
         except Exception as e:
-            self.import_report.setPlainText('Импорт отменён. Данные не изменены.\n\n'+str(e)); self.error(e)
+            self.import_report.setPlainText('Импорт отменён. Данные не изменены.\n\n'+str(e)); self.import_report.show()
+            self.quality_summary.setText('Файл не загружен — причина ниже.'); self.error(e)
 
     def build_history(self):
         box=self.page('История и корректировки','Подтверждённые заявки и журнал изменений с автором, временем и причиной.')
@@ -518,39 +530,54 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
         OrderDetailsDialog(order,name,self.export_saved,self).exec()
 
     def build_settings(self):
-        box=self.page('Настройки','Параметры точки и правила расчёта под контролем продавца')
+        box=self.page('Настройки','Поставка и параметры этой точки')
         save=button('Сохранить настройки',self.save_settings,True); save.setIcon(svg_icon('check','#FFFFFF')); self.page_actions[4].addWidget(save)
-        main=QHBoxLayout(); main.setSpacing(20)
-        frame=QFrame(); frame.setObjectName('surface'); frame.setMaximumWidth(475); pane=QVBoxLayout(frame); pane.setContentsMargins(24,23,24,23); pane.setSpacing(18); pane.addWidget(label('Точка и прогноз','section')); form=QFormLayout(); form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows); form.setSpacing(9)
-        form.addRow('Точка терминала',self.point)
+        body=QWidget(); pane=QVBoxLayout(body); pane.setContentsMargins(0,0,8,0); pane.setSpacing(10)
         self.settings_error=label('','notice'); self.settings_error.setWordWrap(True); self.settings_error.hide(); pane.addWidget(self.settings_error)
-        self.point.setToolTip('Контекст данных терминала. Это настройка, а не механизм авторизации.')
-        settings=self.store.get('settings',{}); self.author_input=QLineEdit(settings.get('author','Продавец'))
-        self.terminal_input=QLineEdit(settings.get('terminal_name','')); self.terminal_input.setPlaceholderText('Например: Терминал 01'); self.terminal_input.setToolTip('Подпись в профиле. Если не задана, показывается имя компьютера.')
+        self.settings_sections={}
+        def section(key,title,expanded=False):
+            frame=QFrame(); frame.setObjectName('surface'); framebox=QVBoxLayout(frame); framebox.setContentsMargins(16,4,16,4)
+            frame.setSizePolicy(QSizePolicy.Policy.Preferred,QSizePolicy.Policy.Maximum)
+            disclosure=Disclosure(title,expanded); framebox.addWidget(disclosure); pane.addWidget(frame); self.settings_sections[key]=disclosure
+            return disclosure.box
+        def form_in(layout):
+            form=QFormLayout(); form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows); form.setSpacing(10); form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow); layout.addLayout(form); return form
+        delivery=section('delivery','Поставка',True); self.date_context=label('','subtitle'); delivery.addWidget(self.date_context); form=form_in(delivery)
+        settings=self.store.get('settings',{})
         self.date_input=QDateEdit(); self.date_input.setCalendarPopup(True); self.date_input.setDate(self.calc_day()); self.date_input.setDisplayFormat('dd.MM.yyyy')
         self.today_check=QCheckBox('Всегда использовать сегодняшнюю дату'); self.today_check.setChecked(settings.get('date_mode')!='manual')
         self.date_input.setEnabled(not self.today_check.isChecked()); self.today_check.toggled.connect(lambda checked:self.date_input.setEnabled(not checked))
-        self.share_input=QDoubleSpinBox(); self.share_input.setRange(.1,1); self.share_input.setSingleStep(.05); self.share_input.setValue(settings.get('regular_share',.6))
-        self.recent_input=QSpinBox(); self.recent_input.setRange(7,90); self.recent_input.setValue(settings.get('recent_days',28))
         self.schedule_check=QCheckBox('График для этой точки задан')
         self.delivery_input=QDateEdit(); self.delivery_input.setCalendarPopup(True); self.delivery_input.setDisplayFormat('dd.MM.yyyy')
         self.interval_input=QSpinBox(); self.interval_input.setRange(1,60)
-        form.addRow('Дата расчёта',self.date_input); form.addRow(self.today_check)
         form.addRow(self.schedule_check); form.addRow('Ближайшая поставка',self.delivery_input); form.addRow('Интервал между поставками, дней',self.interval_input)
-        self.schedule_hint=label('','notice'); self.schedule_hint.setWordWrap(True); form.addRow(self.schedule_hint)
-        form.addRow('Имя для журнала изменений',self.author_input); form.addRow('Название терминала',self.terminal_input)
-        form.addRow('Доля дней с продажами для регулярного спроса',self.share_input); form.addRow('Окно свежего спроса, наблюдений',self.recent_input)
+        self.schedule_hint=label('','notice'); self.schedule_hint.setWordWrap(True); delivery.addWidget(self.schedule_hint)
+        technical=label('Прошедшая поставка не переносится автоматически.','subtitle'); delivery.addWidget(technical)
+        terminal=form_in(section('terminal','Терминал и журнал'))
+        terminal.addRow('Точка терминала',self.point); self.point.setToolTip('Контекст данных терминала. Это настройка, а не механизм авторизации.')
+        self.author_input=QLineEdit(settings.get('author','Продавец'))
+        self.terminal_input=QLineEdit(settings.get('terminal_name','')); self.terminal_input.setPlaceholderText('Например: Терминал 01'); self.terminal_input.setToolTip('Подпись в профиле. Если не задана, показывается имя компьютера.')
+        terminal.addRow('Имя для журнала изменений',self.author_input); terminal.addRow('Название терминала',self.terminal_input)
+        forecast=form_in(section('forecast','Параметры прогноза'))
+        forecast.addRow('Дата расчёта',self.date_input); forecast.addRow(self.today_check)
+        self.share_input=QDoubleSpinBox(); self.share_input.setRange(.1,1); self.share_input.setSingleStep(.05); self.share_input.setValue(settings.get('regular_share',.6))
+        self.recent_input=QSpinBox(); self.recent_input.setRange(7,90); self.recent_input.setValue(settings.get('recent_days',28))
+        forecast.addRow('Доля дней с продажами для регулярного спроса',self.share_input); forecast.addRow('Окно свежего спроса, наблюдений',self.recent_input)
+        assortment=section('assortment','Ассортимент и упаковки')
+        self.item_settings=table(['Позиция','Ед.','Тара','Цель','Резерв / день']); self.item_settings.setMinimumHeight(300)
+        self.item_settings.doubleClicked.connect(self.edit_item_setting); self.item_settings.empty_text('Ассортимент не загружен','Загрузите справочник items на экране «Данные»'); assortment.addWidget(self.item_settings); self.fill_item_settings()
+        note=label('Двойной щелчок — изменить тару, целевой запас или резерв нового блюда. Цель — остаток к концу периода. Второй страховой запас не добавляется.','subtitle'); note.setWordWrap(True); assortment.addWidget(note)
+        backup=section('backup','Резервные копии'); backup.addWidget(button('Создать резервную копию',self.backup_data)); backup.addWidget(button('Восстановить из копии',self.restore_data))
+        self.backup_hint=label('Копия включает данные, заявки и журнал. Перед восстановлением текущая база сохраняется отдельно.','subtitle'); self.backup_hint.setWordWrap(True); backup.addWidget(self.backup_hint)
+        pane.addStretch()
+        self.settings_scroll=QScrollArea(); self.settings_scroll.setWidgetResizable(True); self.settings_scroll.setFrameShape(QFrame.Shape.NoFrame); self.settings_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff); self.settings_scroll.setWidget(body); box.addWidget(self.settings_scroll,1)
         for signal in (self.delivery_input.dateChanged,self.date_input.dateChanged,self.today_check.toggled,self.schedule_check.toggled): signal.connect(self.update_schedule_hint)
-        self.schedule_check.toggled.connect(self.delivery_input.setEnabled); self.schedule_check.toggled.connect(self.interval_input.setEnabled); self.load_point_schedule()
-        pane.addLayout(form); technical=label('Проверьте график при переходе на новый день. Прошедшая поставка не переносится автоматически.','subtitle'); technical.setWordWrap(True); pane.addWidget(technical)
-        pane.addWidget(label('Резервные копии','section'))
-        pane.addWidget(button('Создать резервную копию',self.backup_data)); pane.addWidget(button('Восстановить из копии',self.restore_data))
-        self.backup_hint=label('Копия включает данные, заявки и журнал. Перед восстановлением текущая база сохраняется отдельно.','subtitle'); self.backup_hint.setWordWrap(True); pane.addWidget(self.backup_hint); pane.addStretch()
-        self.settings_scroll=QScrollArea(); self.settings_scroll.setWidgetResizable(True); self.settings_scroll.setFrameShape(QFrame.Shape.NoFrame); self.settings_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff); self.settings_scroll.setWidget(frame); main.addWidget(self.settings_scroll,2)
-        right=QVBoxLayout(); right.setSpacing(14); right.addWidget(label('Ассортимент и упаковки','section'))
-        self.item_settings=table(['Позиция','Ед.','Тара','Цель','Резерв / день']); self.item_settings.doubleClicked.connect(self.edit_item_setting); self.item_settings.empty_text('Ассортимент не загружен','Загрузите справочник items на экране «Данные»')
-        surface=QFrame(); surface.setObjectName('surface'); tablebox=QVBoxLayout(surface); tablebox.setContentsMargins(0,0,0,0); tablebox.addWidget(self.item_settings); right.addWidget(surface,1); self.fill_item_settings()
-        note=label('Двойной щелчок — изменить тару, целевой запас или резерв нового блюда.\nЦель — остаток к концу периода. Второй страховой запас не добавляется.','subtitle'); note.setWordWrap(True); right.addWidget(note); main.addLayout(right,3); box.addLayout(main,1)
+        self.schedule_check.toggled.connect(self.delivery_input.setEnabled); self.schedule_check.toggled.connect(self.interval_input.setEnabled); self.load_point_schedule(); self.update_schedule_hint()
+
+    def reveal_settings_field(self,field):
+        for section in self.settings_sections.values():
+            if section.body.isAncestorOf(field): section.setExpanded(True)
+        QApplication.processEvents(); self.settings_scroll.ensureWidgetVisible(field); field.setFocus()
 
     def fill_item_settings(self):
         if not hasattr(self,'item_settings'): return
@@ -562,14 +589,16 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
         message=('График не задан. Сохранённые остатки доступны; для расчёта заявки задайте поставку.' if not self.schedule_check.isChecked() else
                  f'Ближайшая поставка {arrival:%d.%m.%Y} раньше даты расчёта {day:%d.%m.%Y}. Укажите актуальную дату поставки.' if arrival<day else '')
         self.schedule_hint.setText(message); self.schedule_hint.setVisible(bool(message)); self.settings_error.hide()
+        self.date_context.setText(f'Расчёт на {day:%d.%m.%Y} · '+('сегодняшняя дата' if self.today_check.isChecked() else 'дата задана вручную'))
+        if message: self.settings_sections['delivery'].setExpanded(True)
 
     def save_settings(self):
         try: self._save_settings()
         except DataError as exc:
             self.settings_error.setText(str(exc)); self.settings_error.show()
             field=self.author_input if not self.author_input.text().strip() else self.delivery_input
-            self.settings_scroll.ensureWidgetVisible(field); field.setFocus()
-            self.notify('Настройки не сохранены. '+str(exc))
+            self.reveal_settings_field(field)
+            self.notify('Настройки не сохранены. '+str(exc),persistent=True)
         except (OSError,ValueError,KeyError,sqlite3.Error) as exc: self.error(exc)
     def _save_settings(self):
         if not self.author_input.text().strip(): raise DataError('Введите имя продавца')
@@ -595,7 +624,7 @@ class MainWindow(InteractionMixin,OperationsMixin,WorkspaceNavigation,QMainWindo
             self.notify('Настройки сохранены. Остатки и прогноз обновлены. Для подтверждения заявки повторно сверьте остатки.')
         else:
             problem=self.calculation_error or '; '.join((self.snapshot or {}).get('errors',[]))
-            self.notify('Настройки сохранены. '+('График не задан. ' if not schedule else '')+'Расчёт требует внимания: '+problem,[('Проверить данные',self.resolve_problem)])
+            self.notify('Настройки сохранены. '+('График не задан. ' if not schedule else '')+'Расчёт требует внимания: '+problem,[('Проверить данные',self.resolve_problem)],persistent=True)
     def edit_item_setting(self): self.safe(self._edit_item_setting)
     def _edit_item_setting(self):
         i=self.item_settings.currentRow()
@@ -645,6 +674,7 @@ def main():
     data_dir=Path(os.environ.get('LOCALAPPDATA',str(Path.home()))) / 'RusskieBliny'
     if '--data-dir' in sys.argv: data_dir=Path(sys.argv[sys.argv.index('--data-dir')+1])
     store=Store(data_dir/'data.sqlite3'); store.seed(); window=MainWindow(store); window.show()
+    if '--design-preview' in sys.argv: window.setWindowTitle('КРОНА · Новый обзор · Демо')
     if '--smoke' in sys.argv:
         folder=Path(sys.argv[sys.argv.index('--smoke')+1]); folder.mkdir(parents=True,exist_ok=True)
         def smoke():
